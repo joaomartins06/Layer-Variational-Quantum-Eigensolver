@@ -6,25 +6,23 @@ from collections import Counter
 
 class QuimbSimulator:
 
-    def __init__(self, max_bond: int = None):
-        # max_bond controls MPS bond dimension
-        # None means no truncation -> exact simulation
+    def __init__(self, use_gpu: bool = False, max_bond: int = None):
         self.max_bond = max_bond
 
 
     def _build_circuit(self, params, ansatz):
         #notice this uses an object of the class Ansatz
         #initialize the circuit
-        circ = qtn.Circuit(ansatz.n_qubits)
+        circ = qtn.CircuitMPS(ansatz.n_qubits)
         for gate in ansatz.get_gates(params):
             #add a rotation
             if gate[0] == 'Ry':
                 _, qubit, angle = gate
-                circ.ry(angle, qubit)
+                circ.apply_gate('RY', angle, qubit)
             #add a CNOT
             elif gate[0] == 'CNOT':
                 _, control, target = gate
-                circ.cnot(control, target)
+                circ.apply_gate('CNOT', control, target)
         #get the full circuit
         return circ
 
@@ -41,19 +39,19 @@ class QuimbSimulator:
         #computing the expectation ANALITICALLY value according to the hamiltonian defined in the problem
         #initialize the circuit
         circ = self._build_circuit(params, ansatz)
-        energy = 0.0
 
         #problem is an object of the class CommunityDetection
         #.terms is the list of terms in the hamiltonian, each term is a tuple (coefficient, qubits)
-        for coeff, qubits in problem.terms:
-            if len(qubits) == 0:
-                energy += coeff
-            else:
-                #get the expectation value for this term
-                #notice that the hamiltonian is a sum of pauli strings, so we compute the expectation value
-                #of each term separately and sum them up
-                operator = self._pauli_z_string(qubits)
-                energy += coeff * circ.local_expectation(operator, qubits)
+        identity_energy = sum(coeff for coeff, qubits in problem.terms if not qubits)
+        operator_terms = [(c, q) for c, q in problem.terms if q]
+
+        energy = identity_energy
+        for coeff, qubits in operator_terms:
+            #get the expectation value for this term
+            #notice that the hamiltonian is a sum of pauli strings, so we compute the expectation value
+            #of each term separately and sum them up
+            operator = self._pauli_z_string(qubits)
+            energy += coeff * circ.local_expectation(operator, qubits)
 
         #get the real part (it should be real, but there is always some numerical error)
         return float(energy.real)

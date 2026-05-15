@@ -39,35 +39,45 @@ class CommunityDetection:
 
     def _build_hamiltonian(self):
  
-        terms = []
-        #denominator in the hamiltonian, takes into account the 1/2 in the product
+        from collections import defaultdict
+        
+        grouped = defaultdict(float)
         prefactor = -1.0 / (2 * self.m * (2 ** self.N))
 
         for u in range(self.n_nodes):
             for v in range(self.n_nodes):
                 b_uv = self.B[u, v]
-                # skip negligible terms in case they are not really 0
                 if abs(b_uv) < 1e-12:
                     continue
-                
                 coeff_base = prefactor * b_uv
-                #gets all combinations of bits for the communities depending on the encoding 
-                #this is the loop from j= 1 to N in the paper
-                for j in iterproduct([0, 1], repeat=self.N):
-
-                    #qubits where Z acts in this particular term
+                
+                for S in iterproduct([0, 1], repeat=self.N):
                     qubits = []
+                    for j, include in enumerate(S):
+                        if include:
+                            qubits.append(self._qubit_index(j, u))
+                            qubits.append(self._qubit_index(j, v))
+                    # use tuple as dict key (lists not hashable)
+                    # also: Z*Z = I, so duplicate qubits cancel
+                    # reduce by removing pairs
+                    reduced = tuple(sorted(self._reduce_z_squared(qubits)))
+                    grouped[reduced] += coeff_base
 
-                    for s, bit in enumerate(j):
-                        #bit=0 means this position contributes ident
-                        #bit=1 means this position contributes ZZ
-                        if bit:
-                            qubits.append(self._qubit_index(s, u))
-                            qubits.append(self._qubit_index(s, v))
+        # filter out near-zero coefficients
+        return [
+            (coeff, list(qubits))
+            for qubits, coeff in grouped.items()
+            if abs(coeff) > 1e-12
+        ]
 
-                    terms.append((coeff_base, sorted(qubits)))
-
-        return terms
+    def _reduce_z_squared(self, qubits):
+        """
+        Z * Z = I, so any qubit appearing an even number of times cancels.
+        Returns only qubits appearing an odd number of times.
+        """
+        from collections import Counter
+        counts = Counter(qubits)
+        return [q for q, c in counts.items() if c % 2 == 1]
     
 
     def _modularity(self, assignment):
