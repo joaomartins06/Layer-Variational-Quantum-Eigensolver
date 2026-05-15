@@ -121,4 +121,4 @@ class CommunityDetection:
 
 
     def approximation_ratio(self, energy: float, best_known: float) -> float:
-        return energy / best_known
+        return -energy / best_known

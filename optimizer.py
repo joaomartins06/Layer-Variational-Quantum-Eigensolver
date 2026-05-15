@@ -17,13 +17,13 @@ class COBYLA:
         #optimise uisng COBYLA
         #the cost function will be our hamiltonian
         result = minimize(
-            fun=lambda p: -cost_fn(p),
+            fun=lambda p: cost_fn(p),
             x0=params,
             method='COBYLA',
             options={'maxiter': self.max_iter, 'rhobeg': self.rhobeg}
         )
 
-        return result.x, -result.fun
+        return result.x, result.fun
     
 
 
@@ -74,8 +74,8 @@ class SMO:
             params[k] = theta_min
 
             #evaluate the cost function at the new parameter value
-            current_energy = cost_fn(params)
-            if current_energy > best_energy:
+            current_energy = c - np.sqrt(a**2 + b**2)
+            if current_energy < best_energy:
                 best_energy = current_energy
                 best_params = params.copy()
 
