@@ -41,7 +41,7 @@ class Ansatz:
         gates = []
         idx = 0 
 
-        #ayer 0
+        #layer 0
         for q in range(self.n_qubits):
             gates.append(('Ry', q, params[idx]))
             idx += 1
@@ -53,27 +53,31 @@ class Ansatz:
             #this is the even-odd part
             for control, target in self.even_odd_pairs:
                 gates.append(('CNOT', control, target))
-            for q in range(self.n_qubits):
-                gates.append(('Ry', q, params[idx]))
-                idx += 1
+            for q1, q2 in self.even_odd_pairs:
+                gates.append(('Ry', q1, params[idx]))
+                gates.append(('Ry', q2, params[idx+1]))
+                idx += 2
             #repeat the even-odd part
             for control, target in self.even_odd_pairs:
                 gates.append(('CNOT', control, target))
-            for q in range(self.n_qubits):
-                gates.append(('Ry', q, params[idx]))
-                idx += 1
+            for q1, q2 in self.even_odd_pairs:
+                gates.append(('Ry', q1, params[idx]))
+                gates.append(('Ry', q2, params[idx+1]))
+                idx += 2
 
             #same thing, but now for the odd-even part
             for control, target in self.odd_even_pairs:
                 gates.append(('CNOT', control, target))
-            for q in self.odd_even_qubits:
-                gates.append(('Ry', q, params[idx]))
-                idx += 1
+            for q1, q2 in self.odd_even_pairs:
+                gates.append(('Ry', q1, params[idx]))
+                gates.append(('Ry', q2, params[idx+1]))
+                idx += 2
             #repeat the odd-even part
             for control, target in self.odd_even_pairs:
                 gates.append(('CNOT', control, target))
-            for q in self.odd_even_qubits:
-                gates.append(('Ry', q, params[idx]))
-                idx += 1
+            for q1, q2 in self.odd_even_pairs:
+                gates.append(('Ry', q1, params[idx]))
+                gates.append(('Ry', q2, params[idx+1]))
+                idx += 2
 
         return gates
