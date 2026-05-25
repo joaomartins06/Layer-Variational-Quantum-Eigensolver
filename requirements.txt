@@ -21,6 +21,7 @@ pyparsing==3.3.2
 pytest==9.0.3
 python-dateutil==2.9.0.post0
 qiskit==2.4.1
+qiskit-optimization
 qiskit-aer==0.17.2
 quimb==1.14.0
 rustworkx==0.17.1

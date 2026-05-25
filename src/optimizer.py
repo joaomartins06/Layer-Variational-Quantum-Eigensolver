@@ -5,7 +5,7 @@ from tqdm import tqdm
 class COBYLA:
     ''' 
     Implement the COBYLA optimization algorithm
-    This is one of the optimisation algorithms used in the paper
+    This is one of the optimization algorithms used in the paper
     '''
     
     def __init__(self, max_iter=3000, rhobeg=1.0, verbose=True):

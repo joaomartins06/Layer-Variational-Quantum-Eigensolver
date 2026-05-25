@@ -1,5 +1,5 @@
 import numpy as np
-from ansatze import Ansatz
+from .ansatze import Ansatz
 
 
 class LayerVQE:
@@ -50,8 +50,7 @@ class LayerVQE:
 
     def _record(self, layer, energy):
         #record results
-        best_known = self.problem.best_known_value()
-        ratio = self.problem.approximation_ratio(energy, best_known)
+        ratio = self.problem.get_approximation_ratio(energy)
         self.history['layer'].append(layer)
         self.history['energy'].append(energy)
         self.history['approx_ratio'].append(ratio)
@@ -65,7 +64,7 @@ class LayerVQE:
         print(f"Mode: {'finite sampling' if self.use_sampling else 'exact expectation'}")
 
         #layer 0
-        ansatz = Ansatz(self.problem.n_qubits)
+        ansatz = Ansatz(self.problem.num_qubits)
         cost_fn = self._cost_fn(ansatz)
 
         print(f"\nLayer 0: \n")
@@ -75,7 +74,7 @@ class LayerVQE:
         self._record(0, best_energy)
 
         #layer l > 0
-        #the range is from 1 to n_layers + 1 because we a set of iterations for each layer and
+        #the range is from 1 to n_layers + 1 because we have a set of iterations for each layer and
         #a final set of iterations in the end /just following the suggested algorithm)
         for l in range(1, self.n_layers + 1):
             #add a layer
@@ -101,8 +100,7 @@ class LayerVQE:
             self._record(l, best_energy)
 
         return {'final_energy': best_energy,
-                'final_approx_ratio': self.problem.approximation_ratio(best_energy, 
-                                                                       self.problem.best_known_value()),
+                'final_approx_ratio': self.problem.get_approximation_ratio(best_energy),
                 'final_params': best_params,
                 'final_ansatz': ansatz,
                 'history': self.history}

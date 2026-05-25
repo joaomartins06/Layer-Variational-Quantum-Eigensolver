@@ -2,6 +2,7 @@ import numpy as np
 import quimb as qu
 import quimb.tensor as qtn
 from collections import Counter
+from .maxcut import MaxCut
 
 
 class QuimbSimulator:
@@ -41,9 +42,9 @@ class QuimbSimulator:
         circ = self._build_circuit(params, ansatz)
 
         #problem is an object of the class CommunityDetection
-        #.terms is the list of terms in the hamiltonian, each term is a tuple (coefficient, qubits)
-        identity_energy = sum(coeff for coeff, qubits in problem.terms if not qubits)
-        operator_terms = [(c, q) for c, q in problem.terms if q]
+        #.hamiltonian_terms is the list of terms in the hamiltonian, each term is a tuple (coefficient, qubits)
+        identity_energy = sum(coeff for coeff, qubits in problem.hamiltonian_terms if not qubits)
+        operator_terms = [(c, q) for c, q in problem.hamiltonian_terms if q]
 
         energy = identity_energy
         for coeff, qubits in operator_terms:
@@ -80,7 +81,7 @@ class QuimbSimulator:
         #aux funtion to compute the energy for a given bitstring x
         energy = 0.0
 
-        for coeff, qubits in problem.terms:
+        for coeff, qubits in problem.hamiltonian_terms:
             if len(qubits) == 0:
                 energy += coeff
 
@@ -94,3 +95,22 @@ class QuimbSimulator:
                 energy += coeff * eigenvalue
 
         return energy
+
+    def get_most_frequent_assignments(self, params, ansatz, problem, n_samples=2000):
+        circ = self._build_circuit(params, ansatz)
+
+        counts = Counter(circ.sample(n_samples))
+
+        bitstrings = []
+
+        if not(isinstance(problem, MaxCut)):
+            raise NotImplementedError
+        else:
+            for bitstring, count in counts.most_common(5):
+                measured_bits = [int(b) for b in bitstring]
+                full_assignment = [0] + measured_bits
+
+                probability = (count / n_samples) * 100
+                bitstrings.append((full_assignment, probability))
+
+            return bitstrings
