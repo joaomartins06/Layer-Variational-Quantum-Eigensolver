@@ -2,6 +2,8 @@ import numpy as np
 import quimb as qu
 import quimb.tensor as qtn
 from collections import Counter
+
+from src.community_detection import CommunityDetection
 from .maxcut import MaxCut
 
 
@@ -103,7 +105,7 @@ class QuimbSimulator:
 
         bitstrings = []
 
-        if not(isinstance(problem, MaxCut)):
+        if not(isinstance(problem, MaxCut)) and not(isinstance(problem, CommunityDetection)):
             raise NotImplementedError
         else:
             for bitstring, count in counts.most_common(5):

@@ -65,7 +65,7 @@ class CommunityDetection(Problem):
     def _build_hamiltonian(self) -> HamiltonianType:
         
         grouped = defaultdict(float)
-        prefactor = 1.0 / (2 * self.num_edges * (2 ** self.N))
+        prefactor = -1.0 / (2 * self.num_edges * (2 ** self.N))
 
         for u in range(self.num_nodes):
             for v in range(self.num_nodes):
