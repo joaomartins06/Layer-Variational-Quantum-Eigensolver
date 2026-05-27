@@ -1,5 +1,4 @@
 import numpy as np
-from scipy._lib.pyprima.common import history
 from scipy.optimize import minimize
 from tqdm import tqdm
 
