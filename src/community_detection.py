@@ -11,7 +11,7 @@ class CommunityDetection(Problem):
     """
 
     def __init__(self, graph: nx.Graph, k: int, seed: Optional[int] = None):
-        super().__init__(graph, maximize=True, seed=seed)
+        super().__init__(graph, maximize=False, seed=seed)
         self.k = k
 
         #number of bits/qubits to encode k communities
@@ -30,9 +30,9 @@ class CommunityDetection(Problem):
 
     def _get_best_known_value(self):
         if self.num_nodes <= 12:
-            return self._brute_force_optimum()
+            return -self._brute_force_optimum()
         else:
-            return self._louvain_optimum()
+            return -self._louvain_optimum()
 
     def _brute_force_optimum(self) -> float:
         #just brute force all possible assignments of nodes to communities and compute the modularity

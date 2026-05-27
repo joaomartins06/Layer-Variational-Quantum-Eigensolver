@@ -105,14 +105,27 @@ class QuimbSimulator:
 
         bitstrings = []
 
-        if not(isinstance(problem, MaxCut)) and not(isinstance(problem, CommunityDetection)):
-            raise NotImplementedError
-        else:
+        if isinstance(problem, MaxCut):
             for bitstring, count in counts.most_common(5):
                 measured_bits = [int(b) for b in bitstring]
                 full_assignment = [0] + measured_bits
-
                 probability = (count / n_samples) * 100
                 bitstrings.append((full_assignment, probability))
 
-            return bitstrings
+        elif isinstance(problem, CommunityDetection):
+            n, N = problem.num_nodes, problem.N
+            for bitstring, count in counts.most_common(5):
+                bits = [int(b) for b in bitstring]
+                assignment = [
+                    sum(bits[j * n + v] * (2 ** j) for j in range(N))
+                    for v in range(n)
+                ]
+                probability = (count / n_samples) * 100
+                bitstrings.append((assignment, probability))
+
+        else:
+            raise NotImplementedError
+
+        return bitstrings
+
+
