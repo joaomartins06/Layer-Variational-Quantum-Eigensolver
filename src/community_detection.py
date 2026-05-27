@@ -1,23 +1,22 @@
 import numpy as np
 import networkx as nx
+from .problem import Problem, HamiltonianType
 from itertools import product as iterproduct
+from collections import defaultdict
+from typing import Optional
 
-
-
-class CommunityDetection:
+class CommunityDetection(Problem):
     """
-     Defines the community detection problem and has some methods to compute 
-     the Hamiltonian and best known value.
+     Implementation of the k-Community Detection problem, as described in the Layer-VQE paper.
     """
 
-    def __init__(self, graph: nx.Graph, k: int):
-        self.graph = graph
+    def __init__(self, graph: nx.Graph, k: int, seed: Optional[int] = None):
+        super().__init__(graph, maximize=True, seed=seed)
         self.k = k
-        self.n_nodes = graph.number_of_nodes()
-        self.m = graph.number_of_edges()
+
         #number of bits/qubits to encode k communities
         self.N = int(np.ceil(np.log2(k)))
-        self.n_qubits = self.n_nodes * self.N
+        self.num_qubits = self.num_nodes * self.N
 
         # modularity matrix B_{u,v} = A_{u,v} - d_u*d_v / (2m)
         #taken from the paper
@@ -27,25 +26,49 @@ class CommunityDetection:
         #get the degree of each node
         degrees = np.array([d for _, d in graph.degree()])
         #compute the modularity matrix B
-        self.B = A - np.outer(degrees, degrees) / (2 * self.m)
+        self.B = A - np.outer(degrees, degrees) / (2 * self.num_edges)
 
-        # build Hamiltonian once and cache it
-        self.terms = self._build_hamiltonian()
+    def _get_best_known_value(self):
+        if self.num_nodes <= 12:
+            return self._brute_force_optimum()
+        else:
+            return self._louvain_optimum()
 
+    def _brute_force_optimum(self) -> float:
+        #just brute force all possible assignments of nodes to communities and compute the modularity
+        best = -np.inf
+        for assignment in iterproduct(range(self.k), repeat=self.num_nodes):
+            Q = self.evaluate(list(assignment))
+            if Q > best:
+                best = Q
+        return best
 
-    def _qubit_index(self, bit: int, node: int):
-        return bit * self.n_nodes + node
+    def _louvain_optimum(self) -> float:
+        #gets the best modularity found by the louvain algorithm
+        from networkx.algorithms.community import louvain_communities
+        best = -np.inf
+        nodes_list = list(self.graph.nodes())
+        node_to_idx = {node: i for i, node in enumerate(nodes_list)}
+        for _ in range(20):
+            communities = louvain_communities(self.graph, seed=self.seed)
+            # convert to assignment list
+            assignment = [0] * self.num_nodes
+            for comm_idx, comm in enumerate(communities):
+                for node in comm:
+                    assignment[node_to_idx[node]] = comm_idx
+            Q = self.evaluate(assignment)
+            if Q > best:
+                best = Q
 
+        return best
 
-    def _build_hamiltonian(self):
- 
-        from collections import defaultdict
+    def _build_hamiltonian(self) -> HamiltonianType:
         
         grouped = defaultdict(float)
-        prefactor = -1.0 / (2 * self.m * (2 ** self.N))
+        prefactor = 1.0 / (2 * self.num_edges * (2 ** self.N))
 
-        for u in range(self.n_nodes):
-            for v in range(self.n_nodes):
+        for u in range(self.num_nodes):
+            for v in range(self.num_nodes):
                 b_uv = self.B[u, v]
                 if abs(b_uv) < 1e-12:
                     continue
@@ -70,6 +93,9 @@ class CommunityDetection:
             if abs(coeff) > 1e-12
         ]
 
+    def _qubit_index(self, bit: int, node: int):
+        return bit * self.num_nodes + node
+
     def _reduce_z_squared(self, qubits):
         """
         Z * Z = I, so any qubit appearing an even number of times cancels.
@@ -78,57 +104,14 @@ class CommunityDetection:
         from collections import Counter
         counts = Counter(qubits)
         return [q for q, c in counts.items() if c % 2 == 1]
-    
 
-    def _modularity(self, assignment):
+    def evaluate(self, assignment):
         Q = 0.0
-        for u in range(self.n_nodes):
-            for v in range(self.n_nodes):
+        for u in range(self.num_nodes):
+            for v in range(self.num_nodes):
                 if assignment[u] == assignment[v]:
                     Q += self.B[u, v]
-        return Q / (2 * self.m)
+        return Q / (2 * self.num_edges)
 
-
-    def best_known_value(self):
-
-        if self.n_nodes <= 12:
-            return self._brute_force_optimum()
-        else:
-            return self._louvain_optimum()
-
-
-    def _brute_force_optimum(self):
-        #just brute force all possible assignments of nodes to communities and compute the modularity
-        best = -np.inf
-        for assignment in iterproduct(range(self.k), repeat=self.n_nodes):
-            Q = self._modularity(assignment)
-            if Q > best:
-                best = Q
-        return best
-
-
-    def _louvain_optimum(self):
-        #gets the best modularity found by the louvain algorithm
-        from networkx.algorithms.community import louvain_communities
-        best = -np.inf
-        for _ in range(20):
-            communities = louvain_communities(self.graph, seed=None)
-            # convert to assignment list
-            assignment = [0] * self.n_nodes
-            nodes = list(self.graph.nodes())
-            for comm_idx, comm in enumerate(communities):
-                for node in comm:
-                    assignment[nodes.index(node)] = comm_idx
-            Q = self._modularity(tuple(assignment))
-            if Q > best:
-                best = Q
-
-        return best
-
-
-    def set_best_known_value(self, value: float):
-        self._best_known_value = value
-
-
-    def approximation_ratio(self, energy: float, best_known: float) -> float:
-        return -energy / best_known
+    def get_approximation_ratio(self, energy: float) -> float:
+        return energy / self.best_known_value

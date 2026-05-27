@@ -3,7 +3,7 @@ import numpy as np
 
 class Ansatz:
     ''' 
-    Define the ansatz ciruit to be optimsed. 
+    Define the ansatz circuit to be optimised.
     This class creates an abstraction from how we compute things
     For smaller graphs and for a noisy case, we will be using a circuit.
     For bigger graphs, we will be using a tensor network (there is a limit of around 25 qubits for the circuit)
@@ -13,18 +13,21 @@ class Ansatz:
         self.n_qubits = n_qubits
         self.n_layers = 0
 
-        #pre compute the CNOT pairs for the layers > 0
+        #pre-compute the CNOT pairs for the layers > 0
         self.even_odd_pairs = [(i, i+1) for i in range(0, n_qubits-1, 2)]
         self.odd_even_pairs = [(i, i+1) for i in range(1, n_qubits-1, 2)]
 
-        #randomly initialise parameters for the first layer
+        #randomly initialize parameters for the first layer
         self.params = np.random.uniform(0, 2*np.pi, size=n_qubits)
 
 
     def add_layer(self):
-        #easy to check that, accoriding to the paper's construction, each layer adds 4*n_qubits - 4 rotations
-        n_new = 4 * self.n_qubits - 4  
+        #easy to check that, according to the paper's construction, each layer adds 4*n_qubits - 4 rotations
+        n_new = 4 * self.n_qubits - 4
+
+        #following the paper, the newly added parameters are initialized as zero
         self.params = np.concatenate([self.params, np.zeros(n_new)])
+
         self.n_layers += 1
 
 
@@ -34,7 +37,7 @@ class Ansatz:
 
     def get_gates(self, params: np.ndarray) -> list:
         #get the list of gates
-        #for the rotations, and element is ('Ry', qubit_index, rotation_angle)
+        #for the rotations, an element is ('Ry', qubit_index, rotation_angle)
         #for the CNOTs, an element is ('CNOT', control_qubit_index, target_qubit_index)
         #this will be used later
 

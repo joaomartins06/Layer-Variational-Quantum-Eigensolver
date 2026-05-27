@@ -1,5 +1,5 @@
 import numpy as np
-from ansatze import Ansatz
+from .ansatze import Ansatz
 
 
 class LayerVQE:
@@ -8,7 +8,7 @@ class LayerVQE:
     '''
 
     def __init__(self, problem, simulator, optimizer_class, n_layers=2, k_per_layer=200, k_final=3000,
-                 use_sampling=False, n_samples=2000):
+                 use_sampling=False, n_samples=2000, record_loss=False):
         
         #define the problem
         #in the paper, it is k communities
@@ -17,7 +17,7 @@ class LayerVQE:
         #define the simulator, how we evaluate the hamiltonian
         self.simulator = simulator
         
-        #choose the simulator class
+        #choose the optimizer class
         #in the paper is COBYLA or SMO
         #we can extend to other classes if we want to
         self.optimizer_class = optimizer_class
@@ -31,11 +31,14 @@ class LayerVQE:
         self.use_sampling = use_sampling
         self.n_samples = n_samples
 
+        self.record_loss = record_loss
+
         #track the results
         self.history = {
             'layer': [],
             'energy': [],
             'approx_ratio': [],
+            'optimizer_loss': []
             }
 
 
@@ -48,13 +51,13 @@ class LayerVQE:
             return lambda params: self.simulator.expectation(params, ansatz, self.problem)
 
 
-    def _record(self, layer, energy):
+    def _record(self, layer, energy, loss_history):
         #record results
-        best_known = self.problem.best_known_value()
-        ratio = self.problem.approximation_ratio(energy, best_known)
+        ratio = self.problem.get_approximation_ratio(energy)
         self.history['layer'].append(layer)
         self.history['energy'].append(energy)
         self.history['approx_ratio'].append(ratio)
+        self.history['optimizer_loss'].append(loss_history)
         print(f"layer {layer}: energy={energy:+.4f}, approx_ratio={ratio:+.4f}")
 
 
@@ -65,17 +68,21 @@ class LayerVQE:
         print(f"Mode: {'finite sampling' if self.use_sampling else 'exact expectation'}")
 
         #layer 0
-        ansatz = Ansatz(self.problem.n_qubits)
+        ansatz = Ansatz(self.problem.num_qubits)
         cost_fn = self._cost_fn(ansatz)
 
         print(f"\nLayer 0: \n")
-        optimizer = self.optimizer_class(max_iter=self.k_per_layer)
-        best_params, best_energy = optimizer.optimise(ansatz.params.copy(), cost_fn)
+        optimizer = self.optimizer_class(
+            maximize=self.problem.maximize,
+            max_iter=self.k_per_layer,
+            record_loss=self.record_loss
+        )
+        best_params, best_energy, loss_history = optimizer.optimise(ansatz.params.copy(), cost_fn)
         ansatz.params = best_params
-        self._record(0, best_energy)
+        self._record(0, best_energy, loss_history)
 
         #layer l > 0
-        #the range is from 1 to n_layers + 1 because we a set of iterations for each layer and
+        #the range is from 1 to n_layers + 1 because we have a set of iterations for each layer and
         #a final set of iterations in the end /just following the suggested algorithm)
         for l in range(1, self.n_layers + 1):
             #add a layer
@@ -94,15 +101,18 @@ class LayerVQE:
                 print(f"\nFinal layer — {n_iter} iterations (final)")
 
             #optimize this layer accordingly
-            optimizer = self.optimizer_class(max_iter=n_iter)
-            best_params, best_energy = optimizer.optimise(ansatz.params.copy(), cost_fn)
+            optimizer = self.optimizer_class(
+                maximize=self.problem.maximize,
+                max_iter=n_iter,
+                record_loss=self.record_loss
+            )
+            best_params, best_energy, loss_history = optimizer.optimise(ansatz.params.copy(), cost_fn)
 
             ansatz.params = best_params
-            self._record(l, best_energy)
+            self._record(l, best_energy, loss_history)
 
         return {'final_energy': best_energy,
-                'final_approx_ratio': self.problem.approximation_ratio(best_energy, 
-                                                                       self.problem.best_known_value()),
+                'final_approx_ratio': self.problem.get_approximation_ratio(best_energy),
                 'final_params': best_params,
                 'final_ansatz': ansatz,
                 'history': self.history}
