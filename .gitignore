@@ -219,3 +219,7 @@ __marimo__/
 
 # MacOS
 .DS_Store
+
+# MLflow
+mlruns/
+mlflow.db
