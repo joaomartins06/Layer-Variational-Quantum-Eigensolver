@@ -3,15 +3,15 @@ import networkx as nx
 from .problem import Problem, HamiltonianType
 from itertools import product as iterproduct
 from collections import defaultdict
+from typing import Optional
 
 class CommunityDetection(Problem):
     """
-     Defines the community detection problem and has some methods to compute 
-     the Hamiltonian and best known value.
+     Implementation of the k-Community Detection problem, as described in the Layer-VQE paper.
     """
 
-    def __init__(self, graph: nx.Graph, k: int):
-        super().__init__(graph, maximize=True)
+    def __init__(self, graph: nx.Graph, k: int, seed: Optional[int] = None):
+        super().__init__(graph, maximize=True, seed=seed)
         self.k = k
 
         #number of bits/qubits to encode k communities
@@ -50,7 +50,7 @@ class CommunityDetection(Problem):
         nodes_list = list(self.graph.nodes())
         node_to_idx = {node: i for i, node in enumerate(nodes_list)}
         for _ in range(20):
-            communities = louvain_communities(self.graph, seed=None)
+            communities = louvain_communities(self.graph, seed=self.seed)
             # convert to assignment list
             assignment = [0] * self.num_nodes
             for comm_idx, comm in enumerate(communities):

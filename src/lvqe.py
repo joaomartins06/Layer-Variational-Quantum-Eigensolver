@@ -8,7 +8,7 @@ class LayerVQE:
     '''
 
     def __init__(self, problem, simulator, optimizer_class, n_layers=2, k_per_layer=200, k_final=3000,
-                 use_sampling=False, n_samples=2000):
+                 use_sampling=False, n_samples=2000, record_loss=False):
         
         #define the problem
         #in the paper, it is k communities
@@ -31,11 +31,14 @@ class LayerVQE:
         self.use_sampling = use_sampling
         self.n_samples = n_samples
 
+        self.record_loss = record_loss
+
         #track the results
         self.history = {
             'layer': [],
             'energy': [],
             'approx_ratio': [],
+            'optimizer_loss': []
             }
 
 
@@ -48,12 +51,13 @@ class LayerVQE:
             return lambda params: self.simulator.expectation(params, ansatz, self.problem)
 
 
-    def _record(self, layer, energy):
+    def _record(self, layer, energy, loss_history):
         #record results
         ratio = self.problem.get_approximation_ratio(energy)
         self.history['layer'].append(layer)
         self.history['energy'].append(energy)
         self.history['approx_ratio'].append(ratio)
+        self.history['optimizer_loss'].append(loss_history)
         print(f"layer {layer}: energy={energy:+.4f}, approx_ratio={ratio:+.4f}")
 
 
@@ -68,10 +72,10 @@ class LayerVQE:
         cost_fn = self._cost_fn(ansatz)
 
         print(f"\nLayer 0: \n")
-        optimizer = self.optimizer_class(max_iter=self.k_per_layer)
-        best_params, best_energy = optimizer.optimise(ansatz.params.copy(), cost_fn)
+        optimizer = self.optimizer_class(max_iter=self.k_per_layer, record_loss=self.record_loss)
+        best_params, best_energy, loss_history = optimizer.optimise(ansatz.params.copy(), cost_fn)
         ansatz.params = best_params
-        self._record(0, best_energy)
+        self._record(0, best_energy, loss_history)
 
         #layer l > 0
         #the range is from 1 to n_layers + 1 because we have a set of iterations for each layer and
@@ -93,11 +97,11 @@ class LayerVQE:
                 print(f"\nFinal layer — {n_iter} iterations (final)")
 
             #optimize this layer accordingly
-            optimizer = self.optimizer_class(max_iter=n_iter)
-            best_params, best_energy = optimizer.optimise(ansatz.params.copy(), cost_fn)
+            optimizer = self.optimizer_class(max_iter=n_iter, record_loss=self.record_loss)
+            best_params, best_energy, loss_history = optimizer.optimise(ansatz.params.copy(), cost_fn)
 
             ansatz.params = best_params
-            self._record(l, best_energy)
+            self._record(l, best_energy, loss_history)
 
         return {'final_energy': best_energy,
                 'final_approx_ratio': self.problem.get_approximation_ratio(best_energy),

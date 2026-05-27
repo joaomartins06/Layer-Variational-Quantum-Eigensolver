@@ -1,20 +1,23 @@
 from abc import ABC, abstractmethod
 from functools import cached_property
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
 import networkx as nx
 
 HamiltonianType = List[Tuple[float, List[int]]]
 
 class Problem(ABC):
-    """'Base class for combinatorial optimization problems,
-    as defined in the Layer-VQE paper."""
+    """'
+    Base class for combinatorial optimization (CO) problems, as presented in the Layer-VQE paper.
+    For now, restricted to CO on finite unweighted graphs.
+    """
 
-    def __init__(self, graph: nx.Graph, maximize: bool = True):
+    def __init__(self, graph: nx.Graph, maximize: bool = True, seed: Optional[int] = None):
         self.graph = graph
         self.num_nodes = graph.number_of_nodes()
         self.num_edges = graph.number_of_edges()
         self.num_qubits = None
         self.maximize = maximize  # True for a maximization problem, False for minimization
+        self.seed = seed
 
     @property
     def best_known_value(self) -> Union[float, None]:

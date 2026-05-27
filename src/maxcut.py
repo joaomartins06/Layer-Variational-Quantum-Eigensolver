@@ -2,16 +2,16 @@ import numpy as np
 import networkx as nx
 from itertools import product as iterproduct
 from .problem import Problem, HamiltonianType
+from typing import Optional
 
 
 class MaxCut(Problem):
     """
-     Defines the Max-Cut problem and has some methods to compute
-     the Hamiltonian and best known value.
-    """
+     Implementation of the Max-Cut combinatorial optimization problem.
+     """
 
-    def __init__(self, graph: nx.Graph, seed: int):
-        super().__init__(graph, maximize=True)
+    def __init__(self, graph: nx.Graph, seed: Optional[int] = None):
+        super().__init__(graph, maximize=True, seed=seed)
 
         # we have one qubit per graph node
         self.num_qubits = self.num_nodes - 1
@@ -48,7 +48,7 @@ class MaxCut(Problem):
 
         # num_cuts determines how many random hyperplane projections to try.
         # higher numbers increase the chance of finding the best approximation.
-        gw_optimizer = GoemansWilliamsonOptimizer(num_cuts=20)
+        gw_optimizer = GoemansWilliamsonOptimizer(num_cuts=20, seed=self.seed)
 
         result = gw_optimizer.solve(qp)
 
@@ -74,5 +74,11 @@ class MaxCut(Problem):
         return cut
 
     def get_approximation_ratio(self, energy: float) -> float:
-        cut_value = (0.5 * self.num_edges) - energy
+        cut_value = self.energy_to_cut(energy)
         return cut_value / self.best_known_value
+
+    def energy_to_cut(self, energy: float) -> float:
+        return (0.5 * self.num_edges) - energy
+
+    def cut_to_energy(self, cut: float) -> float:
+        return (0.5 * self.num_edges) - cut

@@ -1,4 +1,5 @@
 import numpy as np
+from scipy._lib.pyprima.common import history
 from scipy.optimize import minimize
 from tqdm import tqdm
 
@@ -8,12 +9,13 @@ class COBYLA:
     This is one of the optimization algorithms used in the paper
     '''
     
-    def __init__(self, max_iter=3000, rhobeg=1.0, verbose=True):
+    def __init__(self, max_iter=3000, rhobeg=1.0, verbose=True, record_loss=False):
         #3000 was the max iterations on the paper, so this will be our default
         self.max_iter = max_iter
         #trust region parameter for the COBYLA algo 
         self.rhobeg = rhobeg
         self.verbose = verbose
+        self.record_loss = record_loss
 
 
     def optimise(self, params, cost_fn):
@@ -22,6 +24,7 @@ class COBYLA:
 
         self.eval_count = 0
         self.best_so_far = np.inf
+        loss_history = []
 
         # COBYLA does roughly n_params + max_iter * 2 evaluations
         n_params = len(params)
@@ -33,6 +36,7 @@ class COBYLA:
         def wrapped(p):
             self.eval_count += 1
             val = cost_fn(p)
+            loss_history.append(val)
             if val < self.best_so_far:
                 self.best_so_far = val
             if self.verbose:
@@ -51,7 +55,7 @@ class COBYLA:
             pbar.close()
             print(f"Total evaluations: {self.eval_count}")
 
-        return result.x, result.fun
+        return result.x, result.fun, loss_history
     
 
 
@@ -61,18 +65,22 @@ class SMO:
     Apparently this is a good optimiser for VQEs and is the other optimiser used in the paper 
     """
 
-    def __init__(self, max_iter=3000):
+    def __init__(self, max_iter=3000, record_loss=False):
         #same things as before
         self.max_iter = max_iter
+        self.record_loss = record_loss
 
     def optimise(self, params, cost_fn):
         params = params.copy()
         n_params = len(params)
         best_energy = cost_fn(params)
         best_params = params.copy()
+        loss_history = []
 
         #start f0, though this will be updated each iteration
         f0 = best_energy
+        if self.record_loss:
+            loss_history = [f0]
 
         for iteration in range(self.max_iter):
             # choose which parameter to update (sequential)
@@ -102,11 +110,14 @@ class SMO:
             #update f0 to the "current" value
             f0 = L_min
 
+            if self.record_loss:
+                loss_history.append(f0)
+
             # track best
             if f0 < best_energy:
                 best_energy = f0
                 best_params = params.copy()
 
-        return best_params, best_energy
+        return best_params, best_energy, loss_history
     
 
