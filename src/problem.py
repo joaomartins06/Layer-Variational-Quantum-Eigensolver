@@ -11,7 +11,7 @@ class Problem(ABC):
     For now, restricted to CO on finite unweighted graphs.
     """
 
-    def __init__(self, graph: nx.Graph, maximize: bool = True, seed: Optional[int] = None):
+    def __init__(self, graph: nx.Graph, maximize: bool = False, seed: Optional[int] = None):
         self.graph = graph
         self.num_nodes = graph.number_of_nodes()
         self.num_edges = graph.number_of_edges()

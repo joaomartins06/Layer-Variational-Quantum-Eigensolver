@@ -17,7 +17,7 @@ class LayerVQE:
         #define the simulator, how we evaluate the hamiltonian
         self.simulator = simulator
         
-        #choose the simulator class
+        #choose the optimizer class
         #in the paper is COBYLA or SMO
         #we can extend to other classes if we want to
         self.optimizer_class = optimizer_class
@@ -72,7 +72,11 @@ class LayerVQE:
         cost_fn = self._cost_fn(ansatz)
 
         print(f"\nLayer 0: \n")
-        optimizer = self.optimizer_class(max_iter=self.k_per_layer, record_loss=self.record_loss)
+        optimizer = self.optimizer_class(
+            maximize=self.problem.maximize,
+            max_iter=self.k_per_layer,
+            record_loss=self.record_loss
+        )
         best_params, best_energy, loss_history = optimizer.optimise(ansatz.params.copy(), cost_fn)
         ansatz.params = best_params
         self._record(0, best_energy, loss_history)
@@ -97,7 +101,11 @@ class LayerVQE:
                 print(f"\nFinal layer — {n_iter} iterations (final)")
 
             #optimize this layer accordingly
-            optimizer = self.optimizer_class(max_iter=n_iter, record_loss=self.record_loss)
+            optimizer = self.optimizer_class(
+                maximize=self.problem.maximize,
+                max_iter=n_iter,
+                record_loss=self.record_loss
+            )
             best_params, best_energy, loss_history = optimizer.optimise(ansatz.params.copy(), cost_fn)
 
             ansatz.params = best_params

@@ -11,8 +11,8 @@ num_nodes = 42
 N_LAYERS = 2
 SIMULATOR=SMO        # SMO or COBYLA
 N_RUNS=5
-K_PER_LAYER=200
-K_FINAL=1500
+K_PER_LAYER=10
+K_FINAL=30
 
 rng = np.random.default_rng(42)
 seeds = rng.integers(0, 10000, size=N_RUNS).tolist()
