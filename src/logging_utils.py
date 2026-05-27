@@ -12,9 +12,6 @@ Quick-start
 
 View all runs:
     mlflow ui   →  http://localhost:5000
-
-Shared tracking (e.g. DagsHub):
-    export MLFLOW_TRACKING_URI=https://dagshub.com/<user>/<repo>.mlflow
 """
 
 from __future__ import annotations

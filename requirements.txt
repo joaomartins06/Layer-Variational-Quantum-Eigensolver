@@ -31,3 +31,4 @@ stevedore==5.7.0
 toolz==1.1.0
 tqdm==4.67.3
 typing_extensions==4.15.0
+mlflow==3.12.0
