@@ -43,14 +43,14 @@ class CommunityDetection(Problem):
                 best = Q
         return best
 
-    def _louvain_optimum(self) -> float:
+    def _louvain_optimum(self, runs = 20) -> float:
         #gets the best modularity found by the louvain algorithm
         from networkx.algorithms.community import louvain_communities
         best = -np.inf
         nodes_list = list(self.graph.nodes())
         node_to_idx = {node: i for i, node in enumerate(nodes_list)}
-        for _ in range(20):
-            communities = louvain_communities(self.graph, seed=self.seed)
+        for i in range(runs):
+            communities = louvain_communities(self.graph, seed=i)
             # convert to assignment list
             assignment = [0] * self.num_nodes
             for comm_idx, comm in enumerate(communities):
