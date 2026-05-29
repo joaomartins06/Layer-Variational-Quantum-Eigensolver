@@ -6,7 +6,7 @@ import networkx as nx
 HamiltonianType = List[Tuple[float, List[int]]]
 
 class Problem(ABC):
-    """'
+    """
     Base class for combinatorial optimization (CO) problems, as presented in the Layer-VQE paper.
     For now, restricted to CO on finite unweighted graphs.
     """
@@ -19,7 +19,7 @@ class Problem(ABC):
         self.maximize = maximize  # True for a maximization problem, False for minimization
         self.seed = seed
 
-    @property
+    @cached_property
     def best_known_value(self) -> Union[float, None]:
         return self._get_best_known_value()
 

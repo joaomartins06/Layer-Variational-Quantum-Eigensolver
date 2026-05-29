@@ -31,7 +31,8 @@ class COBYLA:
             def wrapped(p):
                 self.eval_count += 1
                 val = cost_fn(p)
-                loss_history.append(val)
+                if self.record_loss:
+                    loss_history.append(val)
                 if (self.maximize and val > self.best_so_far) or (not self.maximize and val < self.best_so_far):
                     self.best_so_far = val
                 pbar.update(1)

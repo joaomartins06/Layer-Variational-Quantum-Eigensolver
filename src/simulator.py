@@ -99,6 +99,8 @@ class QuimbSimulator:
         return energy
 
     def get_most_frequent_assignments(self, params, ansatz, problem, n_samples=2000):
+        # TODO: rewrite
+
         circ = self._build_circuit(params, ansatz)
 
         counts = Counter(circ.sample(n_samples))
