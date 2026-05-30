@@ -2,60 +2,115 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import mlflow
+import matplotlib.cm as cm
+from networkx.algorithms.community import louvain_communities
 
-from src.maxcut import MaxCut
+from src.community_detection import CommunityDetection
 from src.simulator import QuimbSimulator
 from src.optimizer import COBYLA, SMO
 from src.lvqe import LayerVQE
 from src.logging_utils import start_run, nested_run, log_figure, log_metrics_series
 
 
-
 # ── Config ─────────────────────────────────────────────────────────────────────
-N_NODES = 10
+N_NODES = 15
+K_COMMUNITIES = 4
 N_LAYERS = 2
-SIMULATOR = SMO
+OPTIMIZER = COBYLA
 N_RUNS = 3
-K_PER_LAYER = 10
-K_FINAL = 30
+K_PER_LAYER = 200
+K_FINAL = 500
 USE_SAMPLING = False
-N_SAMPLES = 20
+N_SAMPLES = 2000
+GRAPH_TYPE = "gnp"   # "caveman", "gnp", "regular"
+SEED_GRAPH = 10
+SEED_ANGLES = 50
 
 PARAMS = dict(
+    problem = "community_detection",
+    graph_type = GRAPH_TYPE,
     num_nodes = N_NODES,
+    k_communities = K_COMMUNITIES,
     n_layers = N_LAYERS,
-    optimizer = SIMULATOR.__name__,
+    optimizer = OPTIMIZER.__name__,
     n_runs = N_RUNS,
     k_per_layer = K_PER_LAYER,
     k_final = K_FINAL,
     use_sampling = USE_SAMPLING,
     n_samples = N_SAMPLES,
+    seed_graph = SEED_GRAPH,
+    seed_angles = SEED_ANGLES,
 )
 
-rng = np.random.default_rng(42)
+rng = np.random.default_rng(SEED_ANGLES)
 seeds = rng.integers(0, 10000, size=N_RUNS).tolist()
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-def get_random_graph(N: int, seed: int, plot: bool = False):
-    assert N % 2 == 0
-    while True:
-        G = nx.random_regular_graph(3, N)
-        if nx.is_connected(G):
-            if plot:
-                plt.figure(figsize=(8, 6))
-                pos = nx.spring_layout(G, seed=seed)
-                nx.draw(G, pos, with_labels=True, node_color="lightblue",
-                        node_size=400, font_size=10, font_weight="bold")
-                plt.title(f"Random regular graph G(k=3, N={G.number_of_nodes()}): "
-                          f"{G.number_of_edges()} edges")
-                plt.show()
-            return G
-        else:
-            seed += 1
+def get_graph(graph_type: str, N: int, k: int, seed: int):
+    """Build a graph of the requested type, ensuring connectivity."""
+    if graph_type == "caveman":
+        # k cliques of size N//k, connected by single bridges
+        assert N % k == 0  
+        return nx.connected_caveman_graph(k, N // k)
+
+    elif graph_type == "gnp":
+        s = seed
+        while True:
+            G = nx.gnp_random_graph(N, p=0.15, seed=s)
+            if nx.is_connected(G):
+                return G
+            s += 1
+
+    elif graph_type == "regular":
+        s = seed
+        while True:
+            G = nx.random_regular_graph(3, N, seed=s)
+            if nx.is_connected(G):
+                return G
+            s += 1
+    else:
+        raise ValueError(f"Unknown graph type: {graph_type}")
 
 
-def make_ratio_plot(all_ratios: np.ndarray, n_runs: int, num_nodes: int) -> plt.Figure:
+def decode_by_sampling(sim, params, ansatz, problem, n_samples=2000):
+    #realist decoding of the final state.
+    #sample bitstrings from the final circuit, pick the most probable assignment, 
+    #compute its true modularity.
+    bitstrings = sim.get_most_frequent_assignments(
+        params, ansatz, problem=problem, n_samples=n_samples
+    )
+    best_assignment, best_proba = bitstrings[0]
+    modularity = problem.evaluate(best_assignment)
+    q_best = -problem.best_known_value
+    return modularity, modularity / q_best, best_assignment, best_proba
+
+def make_partition_plot(G, lvqe_assignment, lvqe_modularity,
+                        best_assignment, best_modularity, seed: int) -> plt.Figure:
+    """Side-by-side comparison: L-VQE decoded partition vs Louvain best-known."""
+    pos = nx.spring_layout(G, seed=42)
+
+    def draw(ax, assignment, title):
+        n_colors = max(assignment) + 1
+        cmap = cm.get_cmap("tab10", max(n_colors, 2))
+        node_colors = [cmap(assignment[node]) for node in G.nodes()]
+        nx.draw_networkx(
+            G, pos=pos, node_color=node_colors, with_labels=True,
+            node_size=600, font_color="white", font_weight="bold",
+            edge_color="gray", ax=ax,
+        )
+        ax.set_title(title)
+        ax.axis("off")
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+    draw(axes[0], lvqe_assignment, f"L-VQE decoded (seed {seed}, Q = {lvqe_modularity:.4f})")
+    draw(axes[1], best_assignment, f"Best known / Louvain (Q = {best_modularity:.4f})")
+    fig.tight_layout()
+    return fig
+
+
+def make_ratio_plot(all_ratios: np.ndarray, n_runs: int, num_nodes: int,
+                    k: int, graph_type: str) -> plt.Figure:
     layers = np.arange(all_ratios.shape[1])
     mean, std = all_ratios.mean(axis=0), all_ratios.std(axis=0)
 
@@ -67,11 +122,11 @@ def make_ratio_plot(all_ratios: np.ndarray, n_runs: int, num_nodes: int) -> plt.
     for ratios in all_ratios:
         ax.plot(layers, ratios, color="steelblue", alpha=0.15, linewidth=1)
     ax.set_xlabel("Layer")
-    ax.set_ylabel("Approximation ratio")
+    ax.set_ylabel("Approximation ratio (energy-based)")
     ax.set_title(f"L-VQE approximation ratio vs. layers\n"
-                 f"(averaged over {n_runs} seeds, {num_nodes}-node 3-regular graph)")
+                 f"({n_runs} seeds, {graph_type} graph, n={num_nodes}, k={k})")
     ax.set_xticks(layers)
-    ax.set_ylim(bottom=0.5)
+    ax.set_ylim(bottom=0.5, top=1.05)
     ax.legend()
     ax.grid(True, linestyle="--", alpha=0.4)
     fig.tight_layout()
@@ -88,8 +143,7 @@ def make_loss_plot(all_losses: list, n_layers: int, k_per_layer: int, n_runs: in
                    label="Layer added" if idx == 1 else "")
     ax.set_xlabel("Total optimisation iterations")
     ax.set_ylabel("Energy (loss)")
-    ax.set_title(f"Training loss evolution across L-VQE layers\n"
-                 f"(showing {n_runs} seeds)")
+    ax.set_title(f"Training loss evolution across L-VQE layers ({n_runs} seeds)")
     ax.legend()
     ax.grid(True, linestyle="--", alpha=0.4)
     fig.tight_layout()
@@ -97,20 +151,32 @@ def make_loss_plot(all_losses: list, n_layers: int, k_per_layer: int, n_runs: in
 
 
 # ── Experiment ─────────────────────────────────────────────────────────────────
-all_ratios = []
+all_ratios_energy = []
 all_losses = []
+all_modularities_decoded = []
+all_ratios_decoded = []
+all_assignments = []  
 
-with start_run("lvqe-maxcut", PARAMS):
+sim = QuimbSimulator()
 
-    for SEED in seeds:
-        print(f"\nRandom seed: {SEED}")
-        G = get_random_graph(N_NODES, seed=SEED)
-        np.random.seed(SEED)
+with start_run("lvqe-comm-detection", PARAMS):
 
+    #notice that the only thing changing between runs is the angle initialization
+    #the graph/problem remains the same throughout the runs
+    
+    G = get_graph(GRAPH_TYPE, N_NODES, K_COMMUNITIES, seed=SEED_GRAPH)
+    problem = CommunityDetection(G, k=K_COMMUNITIES, seed=SEED_GRAPH)
+    q_best = -problem.best_known_value
+    print(f"n_qubits: {problem.num_qubits}, n_terms: {len(problem.hamiltonian_terms)}")
+    print(f"best_known_modularity: {q_best:.4f}") 
+
+    for s in seeds:
+        np.random.seed(s)
+        print(f"\nRandom seed: {s}")
         result = LayerVQE(
-            problem = MaxCut(G, seed=SEED),
-            simulator = QuimbSimulator(),
-            optimizer_class = SIMULATOR,
+            problem = problem,
+            simulator = sim,
+            optimizer_class = OPTIMIZER,
             n_layers = N_LAYERS,
             k_per_layer = K_PER_LAYER,
             k_final = K_FINAL,
@@ -119,37 +185,72 @@ with start_run("lvqe-maxcut", PARAMS):
             record_loss = True,
         ).run()
 
-        seed_ratios = [result["history"]["approx_ratio"][l]
-                       for l in result["history"]["layer"]]
+        seed_ratios_energy = result["history"]["approx_ratio"]
         seed_losses = result["history"]["optimizer_loss"]
+        
 
-        for layer, ratio in enumerate(seed_ratios, start=1):
-            print(f"  Approx ratio after layer {layer}/{N_LAYERS}: {ratio:.4f}")
-        print(f"  Final approx ratio: {result['final_approx_ratio']:.4f}")
+        #final realistic measurement: sample the optimised circuit
+        modularity_decoded, ratio_decoded, best_assignment, best_proba = decode_by_sampling(
+            sim, result["final_params"], result["final_ansatz"], problem, n_samples=N_SAMPLES
+        )
 
-        all_ratios.append(seed_ratios)
+        all_assignments.append((s, modularity_decoded, best_assignment))
+
+        for layer, ratio in enumerate(seed_ratios_energy):
+            print(f"Approx ratio (energy) after layer {layer}: {ratio:.4f}")
+        print(f"Final approx ratio (energy):  {result['final_approx_ratio']:.4f}")
+        print(f"Final approx ratio (decoded): {ratio_decoded:.4f}")
+        print(f"Final modularity (decoded):   {modularity_decoded:.4f}")
+        print(f"Most probable bitstring prob: {best_proba:.2f}%")
+
+        all_ratios_energy.append(seed_ratios_energy)
         all_losses.append(seed_losses)
+        all_modularities_decoded.append(modularity_decoded)
+        all_ratios_decoded.append(ratio_decoded)
 
-        with nested_run(f"seed_{SEED}", {"seed": SEED}):
-            for layer, ratio in enumerate(seed_ratios, start=1):
-                mlflow.log_metric("approx_ratio", ratio, step=layer)
+        with nested_run(f"seed_{s}", {"seed": s}):
+            for layer, ratio in enumerate(seed_ratios_energy):
+                mlflow.log_metric("approx_ratio_energy", ratio, step=layer)
             log_metrics_series("optimizer_loss", np.concatenate(seed_losses))
-            mlflow.log_metric("final_approx_ratio", result["final_approx_ratio"])
+            mlflow.log_metric("final_approx_ratio_energy", result["final_approx_ratio"])
+            mlflow.log_metric("final_approx_ratio_decoded", ratio_decoded)
+            mlflow.log_metric("final_modularity_decoded", modularity_decoded)
+            mlflow.log_metric("best_known_modularity", q_best)
+            mlflow.log_metric("best_bitstring_probability_pct", best_proba)
 
     # ── Aggregate ──────────────────────────────────────────────────────────────
-    all_ratios = np.array(all_ratios)
-    final_col = all_ratios[:, -1]
+    all_ratios_energy = np.array(all_ratios_energy)
+    final_col = all_ratios_energy[:, -1]
+    decoded = np.array(all_ratios_decoded)
+    mods = np.array(all_modularities_decoded)
 
     mlflow.log_metrics({
-        "mean_final_approx_ratio": float(final_col.mean()),
-        "std_final_approx_ratio":  float(final_col.std()),
-        "max_final_approx_ratio":  float(final_col.max()),
-        "min_final_approx_ratio":  float(final_col.min()),
+        "mean_final_approx_ratio_energy":  float(final_col.mean()),
+        "std_final_approx_ratio_energy":   float(final_col.std()),
+        "mean_final_approx_ratio_decoded": float(decoded.mean()),
+        "std_final_approx_ratio_decoded":  float(decoded.std()),
+        "max_final_approx_ratio_decoded":  float(decoded.max()),
+        "min_final_approx_ratio_decoded":  float(decoded.min()),
+        "mean_final_modularity_decoded":   float(mods.mean()),
     })
 
-    log_figure(make_ratio_plot(all_ratios, N_RUNS, N_NODES),
+    log_figure(make_ratio_plot(all_ratios_energy, N_RUNS, N_NODES, K_COMMUNITIES, GRAPH_TYPE),
                "approx_ratio_vs_layers.png")
     log_figure(make_loss_plot(all_losses, N_LAYERS, K_PER_LAYER, N_RUNS),
                "optimizer_loss_vs_iterations.png")
+    
+    #pick the best run across all seeds (highest decoded modularity)
+    best_seed, best_mod_lvqe, best_assignment_lvqe = max(all_assignments, key=lambda x: x[1])
+
+    #louvain reference partition
+    best_assignment_louvain = [0] * problem.num_nodes
+    for comm_idx, comm in enumerate(louvain_communities(G, seed=SEED_GRAPH)):
+        for node in comm:
+            best_assignment_louvain[node] = comm_idx
+    best_mod_louvain = problem.evaluate(best_assignment_louvain)
+
+    log_figure(make_partition_plot(G, best_assignment_lvqe, best_mod_lvqe,
+                            best_assignment_louvain, best_mod_louvain, best_seed),
+                "best_partition_comparison.png")
 
 print("\nRun complete. View results with:  mlflow ui")
