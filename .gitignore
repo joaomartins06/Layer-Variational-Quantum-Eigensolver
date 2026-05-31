@@ -21,6 +21,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+mlruns/
+mlflow.db
 
 # Installer logs
 pip-log.txt

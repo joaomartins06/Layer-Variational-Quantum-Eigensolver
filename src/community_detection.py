@@ -29,7 +29,7 @@ class CommunityDetection(Problem):
         self.B = A - np.outer(degrees, degrees) / (2 * self.num_edges)
 
     def _get_best_known_value(self):
-        if self.num_nodes <= 12:
+        if self.num_nodes <= 10:
             return -self._brute_force_optimum()
         else:
             return -self._louvain_optimum()
