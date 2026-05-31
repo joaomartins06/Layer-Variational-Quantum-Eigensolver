@@ -39,7 +39,7 @@ class COBYLA:
                 if (self.maximize and val > self.best_so_far) or (not self.maximize and val < self.best_so_far):
                     self.best_so_far = val
                 pbar.update(1)
-                pbar.set_postfix({'best_E': f'{self.best_so_far:+.4f}'})
+                pbar.set_postfix({'best_E': f'{self.best_so_far:+.4f}'}, refresh=False)
                 return -val if self.maximize else val
 
             result = minimize(
@@ -128,7 +128,7 @@ class SMO:
                     best_params = params.copy()
 
                 pbar.update(1)
-                pbar.set_postfix({'best_E': f'{best_energy:+.4f}'})
+                pbar.set_postfix({'best_E': f'{best_energy:+.4f}'}, refresh=False)
 
         return best_params, best_energy, loss_history
     
@@ -213,7 +213,7 @@ class Adam:
                     best_params = params.copy()
 
                 pbar.update(1)
-                pbar.set_postfix({'best_E': f'{best_energy:+.4f}'})
+                pbar.set_postfix({'best_E': f'{best_energy:+.4f}'}, refresh=False)
         
         return best_params, best_energy, loss_history
 
