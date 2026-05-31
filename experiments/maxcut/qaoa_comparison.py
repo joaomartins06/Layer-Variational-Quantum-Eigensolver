@@ -16,14 +16,16 @@ N_NODES = 52
 N_INSTANCES = 10
 N_RUNS = 5
 
-N_LAYERS = 4
+# L-VQE
+N_LAYERS = 2
 K_PER_LAYER = 50
-K_FINAL = 300
-
+K_FINAL = 400
 SIMULATOR = SMO
-
 USE_SAMPLING = False
 N_SAMPLES = 100
+
+# QAOA
+
 
 PARAMS = dict(
     num_nodes = N_NODES,
@@ -142,6 +144,9 @@ def make_loss_plot(
     return fig
 
 
+
+
+
 # ── Experiment ─────────────────────────────────────────────────────────────────
 all_ratios = []
 all_losses = []
@@ -163,7 +168,9 @@ with start_run("lvqe-maxcut-schwagerl", PARAMS):
 
                 np.random.seed(RUN_SEED)
 
-                result = LayerVQE(
+                # L-VQE
+
+                result_lvqe = LayerVQE(
                     problem = MaxCut(G, seed=INSTANCE_SEED),
                     simulator = QuimbSimulator(),
                     optimizer_class = SIMULATOR,
@@ -176,24 +183,26 @@ with start_run("lvqe-maxcut-schwagerl", PARAMS):
                     record_loss = True,
                 ).run()
 
-                seed_ratios = [result["history"]["approx_ratio"][l]
-                               for l in result["history"]["layer"]]
-                seed_losses = result["history"]["optimizer_loss"]
+                seed_ratios = [result_lvqe["history"]["approx_ratio"][l]
+                               for l in result_lvqe["history"]["layer"]]
+                seed_losses = result_lvqe["history"]["optimizer_loss"]
 
                 for layer, ratio in enumerate(seed_ratios, start=1):
                     print(f"  Approx ratio after layer {layer}/{N_LAYERS}: {ratio:.4f}")
-                print(f"  Final approx ratio: {result['final_approx_ratio']:.4f}")
+                print(f"  Final approx ratio: {result_lvqe['final_approx_ratio']:.4f}")
 
                 all_ratios.append(seed_ratios)
                 all_losses.append(seed_losses)
                 print(len(seed_losses))
-                instance_run_finals.append(result["final_approx_ratio"])
+                instance_run_finals.append(result_lvqe["final_approx_ratio"])
+
+                # QAOA
 
                 with nested_run(f"run_{RUN_SEED}", {"instance_seed": INSTANCE_SEED, "run_seed": RUN_SEED}):
                     for layer, ratio in enumerate(seed_ratios, start=1):
                         mlflow.log_metric("approx_ratio", ratio, step=layer)
                     log_metrics_series("optimizer_loss", np.concatenate(seed_losses))
-                    mlflow.log_metric("final_approx_ratio", result["final_approx_ratio"])
+                    mlflow.log_metric("final_approx_ratio", result_lvqe["final_approx_ratio"])
 
         instance_best_ratios.append(max(instance_run_finals))
 
