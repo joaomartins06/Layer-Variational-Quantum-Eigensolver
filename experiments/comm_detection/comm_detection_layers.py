@@ -18,17 +18,17 @@ from src.logging_utils import start_run, nested_run, log_figure, log_metrics_ser
 # ── Config ─────────────────────────────────────────────────────────────────────
 N_NODES = 15
 K_COMMUNITIES = 4
-N_LAYERS = 5
-OPTIMIZER = SMO
+N_LAYERS = 2
+OPTIMIZER = Adam
 N_RUNS = 5
-K_PER_LAYER = 50
-K_FINAL = 200
+K_PER_LAYER = 200
+K_FINAL = 500
 USE_SAMPLING = False
 N_SAMPLES = 2000
 GRAPH_TYPE = "gnp"   # "caveman", "gnp", "regular"
 SEED_GRAPH = 10
 SEED_ANGLES = 50
-LEARNING_RATE = 0.24
+LEARNING_RATE = 0.15
 
 PARAMS = dict(
     problem = "community_detection",
@@ -182,7 +182,7 @@ with start_run("lvqe-comm-detection", PARAMS):
             problem = problem,
             simulator = sim,
             optimizer_class = OPTIMIZER,
-            #optimizer_kwargs={"lr": LEARNING_RATE},
+            optimizer_kwargs={"lr": LEARNING_RATE},
             n_layers = N_LAYERS,
             k_per_layer = K_PER_LAYER,
             k_final = K_FINAL,
