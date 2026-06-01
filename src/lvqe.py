@@ -8,7 +8,7 @@ class LayerVQE:
     '''
 
     def __init__(self, problem, simulator, optimizer_class, n_layers=2, k_per_layer=200, k_final=3000,
-                 use_sampling=False, n_samples=2000, record_loss=False):
+                 use_sampling=False, n_samples=2000, record_loss=False, optimizer_kwargs=None):
         
         #define the problem
         #in the paper, it is k communities
@@ -32,6 +32,8 @@ class LayerVQE:
         self.n_samples = n_samples
 
         self.record_loss = record_loss
+
+        self.optimizer_kwargs = optimizer_kwargs or {}
 
         #track the results
         self.history = {
@@ -75,7 +77,8 @@ class LayerVQE:
         optimizer = self.optimizer_class(
             maximize=self.problem.maximize,
             max_iter=self.k_per_layer,
-            record_loss=self.record_loss
+            record_loss=self.record_loss,
+            **self.optimizer_kwargs
         )
         best_params, best_energy, loss_history = optimizer.optimise(ansatz.params.copy(), cost_fn)
         ansatz.params = best_params
@@ -104,7 +107,8 @@ class LayerVQE:
             optimizer = self.optimizer_class(
                 maximize=self.problem.maximize,
                 max_iter=n_iter,
-                record_loss=self.record_loss
+                record_loss=self.record_loss,
+                **self.optimizer_kwargs
             )
             best_params, best_energy, loss_history = optimizer.optimise(ansatz.params.copy(), cost_fn)
 

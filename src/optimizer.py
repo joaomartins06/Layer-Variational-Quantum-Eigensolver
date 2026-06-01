@@ -17,6 +17,9 @@ class COBYLA:
         self.verbose = verbose
         self.record_loss = record_loss
 
+        if verbose:
+            print(f"Optimizer: COBYLA | rhobeg={rhobeg}, max_iter={max_iter}")
+
 
     def optimise(self, params, cost_fn):
         #optimise uisng COBYLA
@@ -36,7 +39,7 @@ class COBYLA:
                 if (self.maximize and val > self.best_so_far) or (not self.maximize and val < self.best_so_far):
                     self.best_so_far = val
                 pbar.update(1)
-                pbar.set_postfix({'best_E': f'{self.best_so_far:+.4f}'})
+                pbar.set_postfix({'best_E': f'{self.best_so_far:+.4f}'}, refresh=False)
                 return -val if self.maximize else val
 
             result = minimize(
@@ -66,6 +69,9 @@ class SMO:
         self.max_iter = max_iter
         self.verbose = verbose
         self.record_loss = record_loss
+
+        if verbose:
+            print(f"Optimizer: SMO | max_iter={max_iter}")
 
     def optimise(self, params, cost_fn):
         params = params.copy()
@@ -122,8 +128,92 @@ class SMO:
                     best_params = params.copy()
 
                 pbar.update(1)
-                pbar.set_postfix({'best_E': f'{best_energy:+.4f}'})
+                pbar.set_postfix({'best_E': f'{best_energy:+.4f}'}, refresh=False)
 
         return best_params, best_energy, loss_history
     
+
+class Adam:
+    """
+    Adaptative moment Estimation (Adam) optimizer
+    The paper uses the two previous optimizers (which are not gradient-based), but we wanted to also test LVQE using Adam optimizer
+    """
+
+    def __init__(self, maximize=False, max_iter=3000, lr=0.05,
+                 beta1=0.9, beta2=0.999, eps=1e-8,
+                 verbose=True, record_loss=False):
+        self.maximize = maximize
+        self.max_iter = max_iter
+        self.lr = lr
+        #this values are the default values for Adam, so we will use these as default as well
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.eps = eps
+
+        self.verbose = verbose
+        self.record_loss = record_loss
+
+        if verbose:
+            print(f"Optimizer: Adam | lr={lr}, beta1={beta1}, beta2={beta2}, eps={eps}, max_iter={max_iter}")
+
+    def optimise(self, params, cost_fn):
+        #the cost function, again, is our hamiltonian 
+
+        params = params.copy()
+        n_params = len(params)
+
+        #initialise moments
+        m = np.zeros(n_params)
+        v = np.zeros(n_params)
+
+        #initialse the best energy and params
+        best_energy = cost_fn(params)
+        best_params = params.copy()
+        loss_history = [best_energy] if self.record_loss else []
+
+        with tqdm(total=self.max_iter, desc="Adam", disable=not self.verbose) as pbar:
+
+            for t in range(1, self.max_iter + 1):
+                #ok, this is the stochastic Adam
+                #I could update all paramaters at each iteration, but it would not compute
+                #each evaluation of one cost_fn takes too long
+
+                k = (t - 1) % n_params
+
+                theta_k = params[k]
+                params[k] = theta_k + np.pi / 2
+                f_plus = cost_fn(params)
+                params[k] = theta_k - np.pi / 2
+                f_minus = cost_fn(params)
+                params[k] = theta_k
+
+                #scalar gradient for parameter k only
+                grad_k = (f_plus - f_minus) / 2.0
+                if self.maximize:
+                    grad_k = -grad_k
+
+                #update only moment k
+                m[k] = self.beta1 * m[k] + (1 - self.beta1) * grad_k
+                v[k] = self.beta2 * v[k] + (1 - self.beta2) * grad_k ** 2
+
+                m_hat = m[k] / (1 - self.beta1 ** t)
+                v_hat = v[k] / (1 - self.beta2 ** t)
+
+                params[k] -= self.lr * m_hat / (np.sqrt(v_hat) + self.eps)
+
+                current_energy = cost_fn(params)
+
+                if self.record_loss:
+                    loss_history.append(current_energy)
+
+                #track best
+                if (self.maximize and current_energy > best_energy) or \
+                   (not self.maximize and current_energy < best_energy):
+                    best_energy = current_energy
+                    best_params = params.copy()
+
+                pbar.update(1)
+                pbar.set_postfix({'best_E': f'{best_energy:+.4f}'}, refresh=False)
+        
+        return best_params, best_energy, loss_history
 
