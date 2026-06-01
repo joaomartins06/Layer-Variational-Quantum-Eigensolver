@@ -7,24 +7,28 @@ from networkx.algorithms.community import louvain_communities
 
 from src.community_detection import CommunityDetection
 from src.simulator import QuimbSimulator
-from src.optimizer import COBYLA, SMO
+from src.optimizer import COBYLA, SMO, Adam
 from src.lvqe import LayerVQE
 from src.logging_utils import start_run, nested_run, log_figure, log_metrics_series
+
+#sorry, this is the command I have to add to run, just so I dont forget :)
+#PYTHONPATH=. 
 
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 N_NODES = 15
 K_COMMUNITIES = 4
-N_LAYERS = 2
-OPTIMIZER = COBYLA
+N_LAYERS = 5
+OPTIMIZER = SMO
 N_RUNS = 5
-K_PER_LAYER = 300
-K_FINAL = 400
+K_PER_LAYER = 50
+K_FINAL = 200
 USE_SAMPLING = False
 N_SAMPLES = 2000
 GRAPH_TYPE = "gnp"   # "caveman", "gnp", "regular"
 SEED_GRAPH = 10
 SEED_ANGLES = 50
+LEARNING_RATE = 0.24
 
 PARAMS = dict(
     problem = "community_detection",
@@ -40,6 +44,7 @@ PARAMS = dict(
     n_samples = N_SAMPLES,
     seed_graph = SEED_GRAPH,
     seed_angles = SEED_ANGLES,
+    learning_rate = LEARNING_RATE,
 )
 
 rng = np.random.default_rng(SEED_ANGLES)
@@ -177,6 +182,7 @@ with start_run("lvqe-comm-detection", PARAMS):
             problem = problem,
             simulator = sim,
             optimizer_class = OPTIMIZER,
+            #optimizer_kwargs={"lr": LEARNING_RATE},
             n_layers = N_LAYERS,
             k_per_layer = K_PER_LAYER,
             k_final = K_FINAL,
