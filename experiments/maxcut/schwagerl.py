@@ -12,13 +12,13 @@ from src.logging_utils import start_run, nested_run, log_figure, log_metrics_ser
 
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-N_NODES = 52
-N_INSTANCES = 10
+N_NODES = 32
+N_INSTANCES = 1
 N_RUNS = 5
 
-N_LAYERS = 4
+N_LAYERS = 1
 K_PER_LAYER = 50
-K_FINAL = 300
+K_FINAL = 450
 
 SIMULATOR = SMO
 
@@ -71,30 +71,44 @@ def make_ratio_plot(
     n_layers = all_ratios.shape[1]
     layers = np.arange(n_layers)
 
-    fig, ax = plt.subplots(figsize=(7, 4))
+    fig, ax = plt.subplots(figsize=(8, 5))
 
     for i, seed in enumerate(instance_seeds):
         instance_ratios = all_ratios[i * n_runs : (i + 1) * n_runs]  # [n_runs, n_layers]
         mean = instance_ratios.mean(axis=0)
         std  = instance_ratios.std(axis=0)
 
-        ax.fill_between(layers, mean - std, mean + std,
-                        alpha=0.10, color=colors[i])
-        ax.plot(layers, mean, "o-", color=colors[i], linewidth=2,
-                markersize=6, label=f"Instance seed {seed}")
         for ratios in instance_ratios:
-            ax.plot(layers, ratios, color=colors[i], alpha=0.15, linewidth=1)
+            ax.plot(layers, ratios, color=colors[i], alpha=0.20, linewidth=1, zorder=1)
+        ax.fill_between(layers, mean - std, mean + std,
+                        alpha=0.18, color=colors[i], zorder=2)
+        ax.plot(layers, mean, "o-", color=colors[i], linewidth=2.5,
+                markersize=7, label=f"Instance seed {seed}", zorder=3)
 
-    ax.set_xlabel("Layer")
-    ax.set_ylabel("Approximation ratio")
+        best_final = instance_ratios[:, -1].max()
+        ax.annotate(
+            f"{best_final:.3f}",
+            xy=(layers[-1], best_final),
+            xytext=(4, 0), textcoords="offset points",
+            fontsize=8, color=colors[i], va="center",
+        )
+
+    ax.axhline(y=1.0, color="black", linestyle=":", linewidth=1.2, alpha=0.6, label="Optimal (ratio = 1)")
+
+    ax.set_xlabel("Layer", fontsize=12)
+    ax.set_ylabel("Approximation ratio", fontsize=12)
     ax.set_title(
         f"L-VQE approximation ratio vs. layers\n"
-        f"(mean ± std over {n_runs} runs, {n_instances} instances, {num_nodes}-node 3-regular graph)"
+        f"(mean ± std over {n_runs} runs, {n_instances} instances, {num_nodes}-node 3-regular graph)",
+        fontsize=12,
     )
     ax.set_xticks(layers)
-    ax.set_ylim(bottom=0.5)
-    ax.legend()
-    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.set_xticklabels([f"Layer {l}" for l in layers], fontsize=9)
+    ax.set_ylim(bottom=0.5, top=1.05)
+    ax.legend(fontsize=9, loc="lower right")
+    ax.grid(True, linestyle="--", alpha=0.35)
+    ax.grid(True, which="minor", linestyle=":", alpha=0.2)
+    ax.minorticks_on()
     fig.tight_layout()
     return fig
 
@@ -109,10 +123,9 @@ def make_loss_plot(
     n_instances = len(instance_seeds)
     colors = plt.cm.tab10(np.linspace(0, 1, n_instances))
 
-    fig, ax = plt.subplots(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(11, 5))
 
     for i, seed in enumerate(instance_seeds):
-        # Grab the n_runs loss trajectories for this instance
         instance_losses = all_losses[i * n_runs : (i + 1) * n_runs]
         trajectories = np.array([np.concatenate(run) for run in instance_losses])
 
@@ -120,24 +133,32 @@ def make_loss_plot(
         std  = trajectories.std(axis=0)
         xs   = np.arange(len(mean))
 
+        for traj in trajectories:
+            ax.plot(xs, traj, color=colors[i], alpha=0.15, linewidth=0.8, zorder=1)
         ax.fill_between(xs, mean - std, mean + std,
-                        alpha=0.10, color=colors[i])
-        ax.plot(xs, mean, linewidth=2, color=colors[i],
-                label=f"Instance seed {seed}")
+                        alpha=0.15, color=colors[i], zorder=2)
+        ax.plot(xs, mean, linewidth=2.5, color=colors[i],
+                label=f"Instance seed {seed}", zorder=3)
 
+    y_top = ax.get_ylim()[1]
     for idx in range(1, n_layers + 1):
-        ax.axvline(x=k_per_layer * idx, color="black",
-                   linestyle="--", alpha=0.5,
-                   label="Layer added" if idx == 1 else "")
+        x = k_per_layer * idx
+        ax.axvline(x=x, color="black", linestyle="--", linewidth=1.2, alpha=0.5,
+                   label="Layer boundary" if idx == 1 else "")
+        ax.text(x + len(mean) * 0.005, y_top, f"L{idx}",
+                fontsize=8, ha="left", va="top", color="black", alpha=0.7)
 
-    ax.set_xlabel("Total optimisation iterations")
-    ax.set_ylabel("Energy (loss)")
+    ax.set_xlabel("Total optimisation iterations", fontsize=12)
+    ax.set_ylabel("Energy (loss)", fontsize=12)
     ax.set_title(
         f"Training loss per instance (mean ± std over {n_runs} runs)\n"
-        f"{n_instances} instances, {n_layers} layers"
+        f"{n_instances} instances, {n_layers} layers",
+        fontsize=12,
     )
-    ax.legend()
-    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.legend(fontsize=9)
+    ax.grid(True, linestyle="--", alpha=0.35)
+    ax.grid(True, which="minor", linestyle=":", alpha=0.2)
+    ax.minorticks_on()
     fig.tight_layout()
     return fig
 

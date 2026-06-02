@@ -3,6 +3,7 @@ import quimb as qu
 import quimb.tensor as qtn
 from collections import Counter
 from .maxcut import MaxCut
+import autoray as ar
 
 
 class QuimbSimulator:
@@ -38,21 +39,22 @@ class QuimbSimulator:
 
     def expectation(self, params, ansatz, problem):
         #computing the expectation ANALITICALLY value according to the hamiltonian defined in the problem
-        #initialize the circuit
-        circ = self._build_circuit(params, ansatz)
+        with ar.backend_like('numpy'):
+            #initialize the circuit
+            circ = self._build_circuit(params, ansatz)
 
-        #problem is an object of the class CommunityDetection
-        #.hamiltonian_terms is the list of terms in the hamiltonian, each term is a tuple (coefficient, qubits)
-        identity_energy = sum(coeff for coeff, qubits in problem.hamiltonian_terms if not qubits)
-        operator_terms = [(c, q) for c, q in problem.hamiltonian_terms if q]
+            #problem is an object of the class CommunityDetection
+            #.hamiltonian_terms is the list of terms in the hamiltonian, each term is a tuple (coefficient, qubits)
+            identity_energy = sum(coeff for coeff, qubits in problem.hamiltonian_terms if not qubits)
+            operator_terms = [(c, q) for c, q in problem.hamiltonian_terms if q]
 
-        energy = identity_energy
-        for coeff, qubits in operator_terms:
-            #get the expectation value for this term
-            #notice that the hamiltonian is a sum of pauli strings, so we compute the expectation value
-            #of each term separately and sum them up
-            operator = self._pauli_z_string(qubits)
-            energy += coeff * circ.local_expectation(operator, qubits)
+            energy = identity_energy
+            for coeff, qubits in operator_terms:
+                #get the expectation value for this term
+                #notice that the hamiltonian is a sum of pauli strings, so we compute the expectation value
+                #of each term separately and sum them up
+                operator = self._pauli_z_string(qubits)
+                energy += coeff * circ.local_expectation(operator, qubits)
 
         #get the real part (it should be real, but there is always some numerical error)
         return float(energy.real)
@@ -75,7 +77,6 @@ class QuimbSimulator:
             energy += (count / n_samples) * self._evaluate_hamiltonian(x, problem)
 
         return energy
-
 
     def _evaluate_hamiltonian(self, x, problem):
         #aux funtion to compute the energy for a given bitstring x
