@@ -251,7 +251,7 @@ if __name__ == '__main__':
             "instance_seeds": instance_seeds,
             "run_seeds": run_seeds,
             "results": [
-                {**r, "seed_losses": [arr.tolist() for arr in r["seed_losses"]]}
+                {**r, "seed_losses": [arr.tolist() if hasattr(arr, "tolist") else arr for arr in r["seed_losses"]]}
                 for r in results_flat
             ],
         }, f)
