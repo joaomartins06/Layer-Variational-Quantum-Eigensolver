@@ -64,38 +64,20 @@ class QuimbSimulator:
 
     def sample_expectation(self, params, ansatz, problem, n_samples=2000):
         #computing the expectation value by sampling bitstrings from the circuit
-        #this is the realistic approach
+        #in a vectorized manner
         #initialize the circuit
         circ = self._build_circuit(params, ansatz)
-
         counts = Counter(circ.sample(n_samples))
 
-        # estimate the energy from the samples
-        energy = 0.0
-        for bitstring, count in counts.items():
-            #parse the string in an array of bits
-            x = np.array([int(b) for b in bitstring])
-            #evaluate the hamiltonian for a certain bitstring
-            energy += (count / n_samples) * self._evaluate_hamiltonian(x, problem)
+        bitstrings = np.array([[int(b) for b in bs] for bs in counts.keys()])
+        weights = np.array(list(counts.values()), dtype=float) / n_samples
 
-        return energy
-
-    def _evaluate_hamiltonian(self, x, problem):
-        #aux funtion to compute the energy for a given bitstring x
-        energy = 0.0
-
+        energy = sum(coeff for coeff, qubits in problem.hamiltonian_terms if not qubits)
         for coeff, qubits in problem.hamiltonian_terms:
-            if len(qubits) == 0:
-                energy += coeff
-
-            else:
-                #compute the parity of the bits in the qubits of this term
-                eigenvalue = 1.0
-                for q in qubits:
-                    # +1 if x[q]=0, -1 if x[q]=1
-                    eigenvalue *= (1 - 2 * x[q])  # +1 if x[q]=0, -1 if x[q]=1
-
-                energy += coeff * eigenvalue
+            if not qubits:
+                continue
+            eigenvalues = np.prod(1 - 2 * bitstrings[:, qubits], axis=1)
+            energy += coeff * float(np.dot(weights, eigenvalues))
 
         return energy
 
