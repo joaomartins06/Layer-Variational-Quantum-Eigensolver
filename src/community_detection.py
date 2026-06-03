@@ -11,7 +11,7 @@ class CommunityDetection(Problem):
     """
 
     def __init__(self, graph: nx.Graph, k: int, seed: Optional[int] = None):
-        super().__init__(graph, maximize=True, seed=seed)
+        super().__init__(graph, maximize=False, seed=seed)
         self.k = k
 
         #number of bits/qubits to encode k communities
@@ -29,10 +29,10 @@ class CommunityDetection(Problem):
         self.B = A - np.outer(degrees, degrees) / (2 * self.num_edges)
 
     def _get_best_known_value(self):
-        if self.num_nodes <= 12:
-            return self._brute_force_optimum()
+        if self.num_nodes <= 10:
+            return -self._brute_force_optimum()
         else:
-            return self._louvain_optimum()
+            return -self._louvain_optimum()
 
     def _brute_force_optimum(self) -> float:
         #just brute force all possible assignments of nodes to communities and compute the modularity
@@ -43,14 +43,14 @@ class CommunityDetection(Problem):
                 best = Q
         return best
 
-    def _louvain_optimum(self) -> float:
+    def _louvain_optimum(self, runs = 20) -> float:
         #gets the best modularity found by the louvain algorithm
         from networkx.algorithms.community import louvain_communities
         best = -np.inf
         nodes_list = list(self.graph.nodes())
         node_to_idx = {node: i for i, node in enumerate(nodes_list)}
-        for _ in range(20):
-            communities = louvain_communities(self.graph)
+        for i in range(runs):
+            communities = louvain_communities(self.graph, seed=i)
             # convert to assignment list
             assignment = [0] * self.num_nodes
             for comm_idx, comm in enumerate(communities):
@@ -65,7 +65,7 @@ class CommunityDetection(Problem):
     def _build_hamiltonian(self) -> HamiltonianType:
         
         grouped = defaultdict(float)
-        prefactor = 1.0 / (2 * self.num_edges * (2 ** self.N))
+        prefactor = -1.0 / (2 * self.num_edges * (2 ** self.N))
 
         for u in range(self.num_nodes):
             for v in range(self.num_nodes):

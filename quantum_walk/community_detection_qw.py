@@ -311,9 +311,7 @@ def visualize_communities(G, result, seed=42, show_edge_probs=True):
     nx.draw_networkx_labels(G, pos, ax=ax, font_size=8)
     n_real = len(non_singleton)
     n_single = len(comms) - n_real
-    ax.set_title("Communities on G\n"
-                 "%d multi-vertex + %d singleton(s)   coverage = %.3f"
-                 % (n_real, n_single, result['coverage']))
+    ax.set_title("Communities on G")
     ax.axis('off')
 
     #histogram with the limiting probabilities
