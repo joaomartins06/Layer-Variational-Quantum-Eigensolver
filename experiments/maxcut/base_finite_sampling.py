@@ -18,9 +18,9 @@ from src.logging_utils import start_run, nested_run, log_figure, log_metrics_ser
 
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-N_NODES = 32
-N_INSTANCES = 2
-N_RUNS = 2
+N_NODES = 52
+N_INSTANCES = 10
+N_RUNS = 3
 
 N_LAYERS = int(os.environ.get("VQE_N_LAYERS", 1))
 K_PER_LAYER = 50
