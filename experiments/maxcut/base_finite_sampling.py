@@ -67,15 +67,20 @@ def _silence():
 
 def _single_run(args):
     """
-    Run one (graph, instance_seed, run_seed) job.
+    Run one (graph, instance_seed, run_seed, best_known_value) job.
     No MLflow calls — safe to run in a worker process.
+    best_known_value is pre-computed in the main process to avoid calling
+    qiskit_optimization (GW solver) inside workers.
     """
-    graph, instance_seed, run_seed = args
+    graph, instance_seed, run_seed, best_known_value = args
     np.random.seed(run_seed)
+
+    problem = MaxCut(graph, seed=instance_seed)
+    problem.__dict__["best_known_value"] = best_known_value
 
     with _silence():
         result = BaseVQE(
-            problem = MaxCut(graph, seed=instance_seed),
+            problem = problem,
             simulator = QuimbSimulator(),
             optimizer_class = SIMULATOR,
             seed = run_seed,
@@ -205,12 +210,15 @@ def make_loss_plot(
 # ── Experiment ─────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
 
-    # Generate all graphs in the main process with deterministic seeding
+    # Generate all graphs and pre-compute best_known_value in the main process.
+    # Workers must not call _gw_optimum() (qiskit_optimization unavailable there).
     graphs = {seed: get_random_graph(N_NODES, seed) for seed in instance_seeds}
+    best_known = {seed: MaxCut(graphs[seed], seed=seed).best_known_value
+                  for seed in instance_seeds}
 
     # Build flat job list preserving instance × run ordering
     jobs = [
-        (graphs[iseed], iseed, rseed)
+        (graphs[iseed], iseed, rseed, best_known[iseed])
         for iseed in instance_seeds
         for rseed in run_seeds
     ]
