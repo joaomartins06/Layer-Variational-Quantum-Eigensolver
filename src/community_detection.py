@@ -2,7 +2,7 @@ import numpy as np
 import networkx as nx
 from .problem import Problem, HamiltonianType
 from itertools import product as iterproduct
-from collections import defaultdict
+from collections import defaultdict, Counter
 from typing import Optional
 
 class CommunityDetection(Problem):
@@ -16,7 +16,6 @@ class CommunityDetection(Problem):
 
         #number of bits/qubits to encode k communities
         self.N = int(np.ceil(np.log2(k)))
-        self.num_qubits = self.num_nodes * self.N
 
         # modularity matrix B_{u,v} = A_{u,v} - d_u*d_v / (2m)
         #taken from the paper
@@ -27,6 +26,10 @@ class CommunityDetection(Problem):
         degrees = np.array([d for _, d in graph.degree()])
         #compute the modularity matrix B
         self.B = A - np.outer(degrees, degrees) / (2 * self.num_edges)
+
+    @property
+    def num_qubits(self) -> int:
+        return self.num_nodes * self.N
 
     def _get_best_known_value(self):
         if self.num_nodes <= 10:
@@ -101,7 +104,6 @@ class CommunityDetection(Problem):
         Z * Z = I, so any qubit appearing an even number of times cancels.
         Returns only qubits appearing an odd number of times.
         """
-        from collections import Counter
         counts = Counter(qubits)
         return [q for q, c in counts.items() if c % 2 == 1]
 

@@ -13,8 +13,10 @@ class MaxCut(Problem):
     def __init__(self, graph: nx.Graph, seed: Optional[int] = None):
         super().__init__(graph, maximize=True, seed=seed)
 
-        # we have one qubit per graph node, minus one because we remove the problem symmetry later
-        self.num_qubits = self.num_nodes - 1
+    @property
+    def num_qubits(self) -> int:
+        # one qubit per graph node, minus one because we remove the problem symmetry
+        return self.num_nodes - 1
 
     def _get_best_known_value(self):
         if self.num_nodes <= 20:
