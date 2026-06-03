@@ -33,6 +33,8 @@ class Problem(ABC):
 
     @abstractmethod
     def _get_best_known_value(self) -> Union[float, None]:
+        """Returns the best known value for the problem.
+        NB: depending on the implementation, might not always be an energy."""
         pass
 
     @abstractmethod

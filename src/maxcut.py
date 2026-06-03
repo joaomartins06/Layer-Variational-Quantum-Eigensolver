@@ -19,6 +19,7 @@ class MaxCut(Problem):
         return self.num_nodes - 1
 
     def _get_best_known_value(self):
+        """Return the best known value *as a cut value*, not as an energy"""
         if self.num_nodes <= 20:
             return self._brute_force_max_cut()
         else:
@@ -86,6 +87,7 @@ class MaxCut(Problem):
 
     def get_approximation_ratio(self, energy: float) -> float:
         # for the approximation ratio, we use the cut values
+        # because that is how self.best_known_value is expressed
         cut_value = self.energy_to_cut(energy)
         return cut_value / self.best_known_value
 

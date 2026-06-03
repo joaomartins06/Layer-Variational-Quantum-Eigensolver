@@ -32,6 +32,7 @@ class CommunityDetection(Problem):
         return self.num_nodes * self.N
 
     def _get_best_known_value(self):
+        """Return the best known value, as an energy"""
         if self.num_nodes <= 10:
             return -self._brute_force_optimum()
         else:
