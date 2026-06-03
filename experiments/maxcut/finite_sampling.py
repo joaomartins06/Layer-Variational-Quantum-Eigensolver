@@ -1,11 +1,13 @@
 import os
 import json
+import time
 import contextlib
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import mlflow
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from datetime import datetime
 
 from src.maxcut import MaxCut
 from src.simulator import QuimbSimulator
@@ -207,14 +209,28 @@ def make_loss_plot(
     return fig
 
 
+# ── Helpers ────────────────────────────────────────────────────────────────────
+def _log(msg: str) -> None:
+    print(f"[{datetime.utcnow().strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
 # ── Experiment ─────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
 
+    experiment_start = time.time()
+    _log(f"=== L-VQE MaxCut finite-sampling experiment ===")
+    _log(f"Config: {N_NODES}-node graph, {N_INSTANCES} instances × {N_RUNS} runs, "
+         f"{N_LAYERS} layers, k_per_layer={K_PER_LAYER}, k_final={K_FINAL}, "
+         f"sampling={USE_SAMPLING} (n_samples={N_SAMPLES}), optimizer={SIMULATOR.__name__}")
+
     # Generate all graphs and pre-compute best_known_value in the main process.
     # Workers must not call _gw_optimum() (qiskit_optimization unavailable there).
+    _log(f"Generating {N_INSTANCES} graphs and computing best-known values...")
     graphs = {seed: get_random_graph(N_NODES, seed) for seed in instance_seeds}
     best_known = {seed: MaxCut(graphs[seed], seed=seed).best_known_value
                   for seed in instance_seeds}
+    _log(f"Graphs ready. Best-known cut values: "
+         + ", ".join(f"{s}→{best_known[s]}" for s in instance_seeds))
 
     # Build flat job list preserving instance × run ordering
     jobs = [
@@ -224,26 +240,56 @@ if __name__ == '__main__':
     ]
 
     n_workers = min(len(jobs), os.cpu_count() or 4)
-    print(f"Launching {len(jobs)} jobs across {n_workers} workers...")
+    n_jobs = len(jobs)
+    _log(f"Submitting {n_jobs} jobs across {n_workers} workers...")
+
+    results_flat = []
+    completed = 0
+    compute_start = time.time()
 
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
-        results_flat = list(executor.map(_single_run, jobs))
+        future_to_args = {
+            executor.submit(_single_run, job): job for job in jobs
+        }
+        for future in as_completed(future_to_args):
+            r = future.result()
+            results_flat.append(r)
+            completed += 1
+            elapsed = time.time() - compute_start
+            eta = (elapsed / completed) * (n_jobs - completed)
+            _log(f"  [{completed}/{n_jobs}] instance={r['instance_seed']}  "
+                 f"run={r['run_seed']}  "
+                 f"final_approx_ratio={r['final_approx_ratio']:.4f}  "
+                 f"elapsed={elapsed:.0f}s  eta={eta:.0f}s")
+
+    # Re-sort to canonical instance × run order (as_completed returns out-of-order)
+    order = {(iseed, rseed): idx
+             for idx, (iseed, rseed) in enumerate(
+                 (iseed, rseed)
+                 for iseed in instance_seeds
+                 for rseed in run_seeds
+             )}
+    results_flat.sort(key=lambda r: order[(r["instance_seed"], r["run_seed"])])
+
+    compute_elapsed = time.time() - compute_start
+    _log(f"All {n_jobs} jobs finished in {compute_elapsed:.1f}s")
 
     # Index results for easy lookup during logging
     results = {(r["instance_seed"], r["run_seed"]): r for r in results_flat}
 
-    # Print summary
+    # Per-instance summary
+    _log("--- Results summary ---")
     for iseed in instance_seeds:
-        for rseed in run_seeds:
-            r = results[(iseed, rseed)]
-            print(f"  instance={iseed}  run={rseed}  "
-                  f"final_approx_ratio={r['final_approx_ratio']:.4f}")
+        ratios = [results[(iseed, rseed)]["final_approx_ratio"] for rseed in run_seeds]
+        _log(f"  instance={iseed}  ratios={[f'{x:.4f}' for x in ratios]}  "
+             f"best={max(ratios):.4f}")
 
     # ── Save raw results to JSON (for cloud → local MLflow import) ──────────────
     json_path = os.path.join(
         os.path.dirname(__file__),
         f"results_lvqe_{N_LAYERS}layers.json"
     )
+    _log(f"Saving results → {json_path}")
     with open(json_path, "w") as f:
         json.dump({
             "experiment": "lvqe-maxcut-schwagerl",
@@ -251,11 +297,11 @@ if __name__ == '__main__':
             "instance_seeds": instance_seeds,
             "run_seeds": run_seeds,
             "results": [
-                {**r, "seed_losses": [arr.tolist() for arr in r["seed_losses"]]}
+                {**r, "seed_losses": [arr.tolist() if hasattr(arr, "tolist") else arr for arr in r["seed_losses"]]}
                 for r in results_flat
             ],
         }, f)
-    print(f"Results saved → {json_path}")
+    _log(f"JSON saved ({os.path.getsize(json_path) / 1024:.1f} KB)")
 
     # ── MLflow logging (sequential, main process only) ──────────────────────────
     all_ratios = [results[(iseed, rseed)]["seed_ratios"]
@@ -267,9 +313,13 @@ if __name__ == '__main__':
         for iseed in instance_seeds
     ]
 
+    _log(f"Logging to MLflow ({N_INSTANCES} instances × {N_RUNS} runs)...")
+    mlflow_start = time.time()
+
     with start_run("lvqe-maxcut-schwagerl", PARAMS):
 
         for i, iseed in enumerate(instance_seeds):
+            _log(f"  MLflow: instance {i+1}/{N_INSTANCES} (seed={iseed})")
             with nested_run(f"instance_{iseed}", {"instance_seed": iseed}):
                 for rseed in run_seeds:
                     r = results[(iseed, rseed)]
@@ -290,7 +340,10 @@ if __name__ == '__main__':
             "max_final_approx_ratio":  float(finals.max()),
             "min_final_approx_ratio":  float(finals.min()),
         })
+        _log(f"  Aggregate metrics: mean={finals.mean():.4f}  "
+             f"max={finals.max():.4f}  min={finals.min():.4f}")
 
+        _log("  Generating and logging plots...")
         log_figure(
             make_ratio_plot(all_ratios_arr, instance_seeds, N_RUNS, N_NODES),
             "approx_ratio_vs_layers.png"
@@ -300,4 +353,5 @@ if __name__ == '__main__':
             "optimizer_loss_vs_iterations.png"
         )
 
-    print("\nRun complete. View results with:  mlflow ui")
+    _log(f"MLflow logging done in {time.time() - mlflow_start:.1f}s")
+    _log(f"=== Experiment complete — total {time.time() - experiment_start:.1f}s ===")

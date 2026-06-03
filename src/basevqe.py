@@ -4,7 +4,16 @@ from .ansatze import Ansatz
 
 class BaseVQE:
     '''
-    ...
+    Fixed-ansatz VQE baseline used in Section VI-B of Liu et al. (2022).
+
+    Unlike L-VQE, the ansatz is built upfront to its full depth (all n_layers added
+    at once) and all parameters are optimized in a single run with the full budget
+    (n_layers * k_per_layer + k_final iterations). Layer-0 parameters are randomly
+    initialized; deeper-layer parameters start at zero.
+
+    With finite sampling, performance degrades as depth increases because the
+    optimizer must navigate a large, poorly initialized landscape from scratch.
+    L-VQE avoids this by growing the circuit gradually with warm-started parameters.
     '''
 
     def __init__(self, problem, simulator, optimizer_class, seed=None, n_layers=2, k_per_layer=200, k_final=3000,

@@ -15,7 +15,6 @@ class Problem(ABC):
         self.graph = graph
         self.num_nodes = graph.number_of_nodes()
         self.num_edges = graph.number_of_edges()
-        self.num_qubits = None
         self.maximize = maximize  # True for a maximization problem, False for minimization
         self.seed = seed
 
@@ -27,8 +26,15 @@ class Problem(ABC):
     def hamiltonian_terms(self) -> HamiltonianType:
         return self._build_hamiltonian()
 
+    @property
+    @abstractmethod
+    def num_qubits(self) -> int:
+        pass
+
     @abstractmethod
     def _get_best_known_value(self) -> Union[float, None]:
+        """Returns the best known value for the problem.
+        NB: depending on the implementation, might not always be an energy."""
         pass
 
     @abstractmethod
