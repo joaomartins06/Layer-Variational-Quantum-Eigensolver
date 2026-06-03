@@ -1,0 +1,43 @@
+name: VQE Experiment
+
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: "Which model to run"
+        required: true
+        type: choice
+        options:
+          - finite_sampling        # Layer VQE
+          - base_finite_sampling   # Base VQE
+      n_layers:
+        description: "Number of layers (VQE_N_LAYERS)"
+        required: true
+        default: "1"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run experiment
+        env:
+          VQE_N_LAYERS: ${{ github.event.inputs.n_layers }}
+        run: python -m experiments.maxcut.${{ github.event.inputs.script }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ github.event.inputs.script }}-${{ github.event.inputs.n_layers }}layers
+          path: experiments/maxcut/results_*.json
+          retention-days: 30

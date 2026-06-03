@@ -9,7 +9,7 @@ class Ansatz:
     For bigger graphs, we will be using a tensor network (there is a limit of around 25 qubits for the circuit)
     '''
 
-    def __init__(self, n_qubits: int):
+    def __init__(self, n_qubits: int, seed=None):
         self.n_qubits = n_qubits
         self.n_layers = 0
 
@@ -18,6 +18,7 @@ class Ansatz:
         self.odd_even_pairs = [(i, i+1) for i in range(1, n_qubits-1, 2)]
 
         #randomly initialize parameters for the first layer
+        np.random.seed(seed)
         self.params = np.random.uniform(0, 2*np.pi, size=n_qubits)
 
 

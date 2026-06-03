@@ -6,8 +6,7 @@ class LayerVQE:
     ''' 
     Now we join everything.
     '''
-
-    def __init__(self, problem, simulator, optimizer_class, n_layers=2, k_per_layer=200, k_final=3000,
+    def __init__(self, problem, simulator, optimizer_class, seed=None, n_layers=2, k_per_layer=200, k_final=3000,
                  use_sampling=False, n_samples=2000, record_loss=False, optimizer_kwargs=None):
         
         #define the problem
@@ -21,6 +20,8 @@ class LayerVQE:
         #in the paper is COBYLA or SMO
         #we can extend to other classes if we want to
         self.optimizer_class = optimizer_class
+
+        self.seed = seed
 
         #define the number of layers, iterations per layer and final iterations
         #the default valus were taken from the paper
@@ -70,7 +71,7 @@ class LayerVQE:
         print(f"Mode: {'finite sampling' if self.use_sampling else 'exact expectation'}")
 
         #layer 0
-        ansatz = Ansatz(self.problem.num_qubits)
+        ansatz = Ansatz(self.problem.num_qubits, seed=self.seed)
         cost_fn = self._cost_fn(ansatz)
 
         print(f"\nLayer 0: \n")
