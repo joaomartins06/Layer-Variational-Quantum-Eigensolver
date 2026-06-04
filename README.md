@@ -1,11 +1,8 @@
 ### Applied Quantum Algorithms Projects
-***
  
 # Layer VQE
 
 Student project for the **Applied Quantum Algorithms** course (Delft, Q3-Q4 2026).
-
----
 
 ## Overview
 
