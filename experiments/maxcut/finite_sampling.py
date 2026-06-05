@@ -24,7 +24,7 @@ N_RUNS = 3
 
 N_LAYERS = int(os.environ.get("VQE_N_LAYERS", 2))
 K_PER_LAYER = 50
-K_FINAL = 400
+K_FINAL = 500 - N_LAYERS*K_PER_LAYER
 
 SIMULATOR = SMO
 
