@@ -46,7 +46,8 @@ liu.pdf                 # Reference paper
 ## Setup
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+conda create -n layerVQE python=3.11
+conda activate layerVQE
 pip install -r requirements.txt
 ```
 
