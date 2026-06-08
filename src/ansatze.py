@@ -2,12 +2,10 @@ import numpy as np
 
 
 class Ansatz:
-    ''' 
-    Define the ansatz circuit to be optimised.
-    This class creates an abstraction from how we compute things
-    For smaller graphs and for a noisy case, we will be using a circuit.
-    For bigger graphs, we will be using a tensor network (there is a limit of around 25 qubits for the circuit)
-    '''
+    """
+    Layered ansatz for VQE. Stores parameters and generates the gate sequence
+    (Ry rotations + CNOTs) consumed by QuimbSimulator.
+    """
 
     def __init__(self, n_qubits: int, seed=None):
         self.n_qubits = n_qubits
