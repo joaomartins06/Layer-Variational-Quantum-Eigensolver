@@ -3,24 +3,35 @@ from .ansatze import Ansatz
 
 
 class LayerVQE:
-    ''' 
-    Now we join everything.
     '''
+    Layer Variational Quantum Eigensolver (L-VQE) as described in Liu et al. (2022).
 
-    def __init__(self, problem, simulator, optimizer_class, n_layers=2, k_per_layer=200, k_final=3000,
+    Grows the ansatz one layer at a time, reusing previously optimized parameters
+    as a warm start for each deeper circuit. Each new layer is zero-initialized so
+    the circuit output is unchanged when the layer is added, giving the optimizer a
+    good starting point near the previous solution rather than a random one.
+
+    Schedule: k_per_layer iterations per intermediate layer, k_final for the last.
+    This staged growth avoids the local-minima traps that afflict a randomly
+    initialized deep ansatz, and is empirically more robust to finite sampling noise
+    than the fixed-ansatz VQE baseline (Section VI-B of the paper).
+    '''
+    def __init__(self, problem, simulator, optimizer_class, seed=None, n_layers=2, k_per_layer=200, k_final=3000,
                  use_sampling=False, n_samples=2000, record_loss=False, optimizer_kwargs=None):
-        
+
         #define the problem
         #in the paper, it is k communities
         self.problem = problem
 
         #define the simulator, how we evaluate the hamiltonian
         self.simulator = simulator
-        
+
         #choose the optimizer class
         #in the paper is COBYLA or SMO
         #we can extend to other classes if we want to
         self.optimizer_class = optimizer_class
+
+        self.seed = seed
 
         #define the number of layers, iterations per layer and final iterations
         #the default valus were taken from the paper
@@ -70,7 +81,7 @@ class LayerVQE:
         print(f"Mode: {'finite sampling' if self.use_sampling else 'exact expectation'}")
 
         #layer 0
-        ansatz = Ansatz(self.problem.num_qubits)
+        ansatz = Ansatz(self.problem.num_qubits, seed=self.seed)
         cost_fn = self._cost_fn(ansatz)
 
         print(f"\nLayer 0: \n")
