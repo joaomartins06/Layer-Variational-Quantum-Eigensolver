@@ -4,7 +4,7 @@ import quimb.tensor as qtn
 from collections import Counter
 
 from src.community_detection import CommunityDetection
-from .maxcut import MaxCut
+from src.maxcut import MaxCut
 import autoray as ar
 
 
