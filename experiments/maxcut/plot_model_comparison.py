@@ -92,7 +92,7 @@ for label, sub_df in [("Layer VQE", layer_vqe), ("Base VQE", base_vqe)]:
     )
     ax.fill_between(x, y - e, y + e, alpha=0.15, color=color, zorder=2)
 
-ax.axhline(y=1.0, color="black", linestyle=":", linewidth=1.2, alpha=0.6, label="Optimal")
+ax.axhline(y=1.0, color="black", linestyle=":", linewidth=1.2, alpha=0.6, label="BKV (SW)")
 
 ax.set_xlabel("Number of layers", fontsize=12)
 ax.set_ylabel("Final approximation ratio", fontsize=12)
@@ -111,3 +111,59 @@ out_path = os.path.join(os.path.dirname(__file__), "results/model_comparison.pdf
 fig.savefig(out_path, dpi=150)
 print(f"Saved → {out_path}")
 plt.show()
+
+# ── Beamer-ready figure ────────────────────────────────────────────────────────
+import matplotlib as mpl
+
+with mpl.rc_context({"font.size": 13, "font.family": "sans-serif"}):
+    fig_b, ax_b = plt.subplots(figsize=(8, 4.8))
+
+    for label, sub_df in [("Layer VQE", layer_vqe), ("Base VQE", base_vqe)]:
+        color = COLORS[label]
+        x = sub_df["n_layers"].values
+        y = sub_df["mean"].values
+        e = sub_df["sem"].values
+
+        ax_b.errorbar(
+            x, y, yerr=e,
+            fmt="o-", color=color, linewidth=3, markersize=9,
+            capsize=5, capthick=2, elinewidth=2,
+            label=label, zorder=3,
+        )
+        ax_b.fill_between(x, y - e, y + e, alpha=0.15, color=color, zorder=2)
+
+    ax_b.axhline(y=1.0, color="black", linestyle=":", linewidth=1.5, alpha=0.6, label="BKV (SW)")
+
+    # Double-headed arrow annotating the gap at layer 2
+    x_ann = 2
+    lvqe_row = layer_vqe[layer_vqe["n_layers"] == x_ann]
+    bvqe_row = base_vqe[base_vqe["n_layers"] == x_ann]
+    if not lvqe_row.empty and not bvqe_row.empty:
+        lvqe_y = lvqe_row["mean"].values[0]
+        bvqe_y = bvqe_row["mean"].values[0]
+        gap = lvqe_y - bvqe_y
+        ax_b.annotate(
+            "",
+            xy=(x_ann + 0.13, bvqe_y),
+            xytext=(x_ann + 0.13, lvqe_y),
+            arrowprops=dict(arrowstyle="<->", color="#555555", lw=1.5),
+            zorder=5,
+        )
+        ax_b.text(
+            x_ann + 0.20, (lvqe_y + bvqe_y) / 2,
+            f"$\\Delta = {gap:.3f}$",
+            fontsize=11, color="#555555", va="center",
+        )
+
+    ax_b.set_xlabel("Number of layers", fontsize=15)
+    ax_b.set_ylabel("Final approximation ratio", fontsize=15)
+    ax_b.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
+    ax_b.set_ylim(bottom=0.9, top=1.01)
+    ax_b.tick_params(axis="both", labelsize=12)
+    ax_b.legend(fontsize=12, loc="lower right")
+    ax_b.grid(True, linestyle="--", alpha=0.35)
+    fig_b.tight_layout()
+
+    beamer_path = os.path.join(os.path.dirname(__file__), "results/model_comparison_beamer.pdf")
+    fig_b.savefig(beamer_path, bbox_inches="tight")
+    print(f"Saved → {beamer_path}")
