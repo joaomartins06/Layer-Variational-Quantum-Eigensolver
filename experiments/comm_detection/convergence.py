@@ -13,20 +13,20 @@ from src.logging_utils import start_run, nested_run, log_figure
  
 # PYTHONPATH=.
  
-N_NODES_LIST   = [8, 10, 12, 14, 16, 18, 20]
+N_NODES_LIST   = [8, 12, 16, 20]
 K_COMMUNITIES  = 4
 LAYER_CONFIGS  = [0, 1, 2]
 
-OPTIMIZER      = SMO
-N_RUNS         = 5
+OPTIMIZER      = COBYLA
+N_RUNS         = 3
 K_PER_LAYER    = 200
-MAX_ITER       = 200
-EPSILON        = 0.5e-2
-T_MAX          = 50
-USE_SAMPLING   = True
+MAX_ITER       = 1000
+EPSILON        = 1e-4
+T_MAX          = 100
+USE_SAMPLING   = False
 N_SAMPLES      = 200
 LEARNING_RATE  = 0.15
- 
+
 GRAPH_TYPE     = "gnp"
 SEED_GRAPH     = 10
 SEED_ANGLES    = 50
@@ -250,9 +250,9 @@ for n_nodes in N_NODES_LIST:
                 seed             = s,
             ).run()
  
-            final_layer_loss      = result["history"]["optimizer_loss"][-1]
-            converged, n_iter     = find_convergence_iteration(
-                final_layer_loss, EPSILON, T_MAX, maximize=problem.maximize
+            all_layers_loss   = np.concatenate(result["history"]["optimizer_loss"])
+            converged, n_iter = find_convergence_iteration(
+                all_layers_loss, EPSILON, T_MAX, maximize=problem.maximize
             )
             ratio = result["final_approx_ratio"]
  
