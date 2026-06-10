@@ -15,22 +15,22 @@ from src.logging_utils import start_run, nested_run, log_figure
  
 N_NODES_LIST   = [8, 12, 16, 20]
 K_COMMUNITIES  = 4
-LAYER_CONFIGS  = [0, 1, 2]
+LAYER_CONFIGS  = [0, 1, 2] 
 
 OPTIMIZER      = COBYLA
 N_RUNS         = 3
 K_PER_LAYER    = 200
-MAX_ITER       = 1000
-EPSILON        = 1e-4
+MAX_ITER       = 2400
+EPSILON        = 0.5e-2
 T_MAX          = 100
 USE_SAMPLING   = False
 N_SAMPLES      = 200
-LEARNING_RATE  = 0.15
+LEARNING_RATE  = 0.1
 
 GRAPH_TYPE     = "gnp"
 SEED_GRAPH     = 10
 SEED_ANGLES    = 50
- 
+
 CHECKPOINT_FILE = "experiments/comm_detection/convergence_checkpoint.json"
  
 PARAMS = dict(
@@ -107,17 +107,19 @@ def get_graph(graph_type, N, k, seed):
         raise ValueError(f"Unknown graph type: {graph_type}")
  
  
-def find_convergence_iteration(loss_history, epsilon, t_max, maximize):
-    arr  = np.asarray(loss_history, dtype=float)
-    best = np.maximum.accumulate(arr) if maximize else np.minimum.accumulate(arr)
-    n    = len(best)
-    if n <= t_max:
-        return False, n
-    diffs = np.abs(best[t_max:] - best[:-t_max])
-    hits  = np.where(diffs < epsilon)[0]
-    if len(hits) == 0:
-        return False, n
-    return True, int(hits[0] + t_max)
+def find_convergence_iteration(loss_history, epsilon, t_max):
+    arr = np.asarray(loss_history, dtype=float)
+    threshold  = arr.min() + epsilon
+    violations = np.where(arr > threshold)[0]
+
+    if len(violations) == 0:
+        conv_iter = 0
+    else:
+        conv_iter = int(violations[-1]) + 1
+
+    if conv_iter + t_max > len(arr):
+        return False, len(arr)
+    return True, conv_iter
  
  
 def power_law_fit(n_arr, iter_mean, iter_std):
@@ -252,7 +254,7 @@ for n_nodes in N_NODES_LIST:
  
             all_layers_loss   = np.concatenate(result["history"]["optimizer_loss"])
             converged, n_iter = find_convergence_iteration(
-                all_layers_loss, EPSILON, T_MAX, maximize=problem.maximize
+                all_layers_loss, EPSILON, T_MAX
             )
             ratio = result["final_approx_ratio"]
  
