@@ -47,7 +47,7 @@ class CommunityDetection(Problem):
                 best = Q
         return best
 
-    def _louvain_optimum(self, runs = 20) -> float:
+    def _louvain_optimum(self, runs = 500) -> float:
         #gets the best modularity found by the louvain algorithm
         from networkx.algorithms.community import louvain_communities
         best = -np.inf
