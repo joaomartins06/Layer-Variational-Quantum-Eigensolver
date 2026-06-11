@@ -12,17 +12,17 @@ from src.lvqe import LayerVQE
 from src.logging_utils import start_run, nested_run, log_figure
  
 # PYTHONPATH=.
- 
-N_NODES        = 20
+
+N_NODES        = 8
 K_COMMUNITIES  = 4
 N_LAYERS       = 2
-OPTIMIZERS     = [SMO, COBYLA]            
+OPTIMIZERS     = [SMO, COBYLA, Adam]            
 OPTIMIZER_KWARGS = {
     "SMO":    {"verbose": True},
     "COBYLA": {"verbose": True},
     "Adam":   {"verbose": True, "lr": 0.15},
 }
-N_RUNS         = 5
+N_RUNS         = 2
 K_PER_LAYER    = 200
 K_FINAL        = 500
 USE_SAMPLING   = True
