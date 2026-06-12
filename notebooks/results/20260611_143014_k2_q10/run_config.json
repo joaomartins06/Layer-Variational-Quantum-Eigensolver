@@ -1,0 +1,30 @@
+{
+  "timestamp": "20260611_143014",
+  "seed": 42,
+  "k_communities": 2,
+  "n_layers": 2,
+  "k_per_layer": 20,
+  "k_final": 100,
+  "optimizer": "COBYLA",
+  "use_real_hardware": true,
+  "scenarios": [
+    "Real Hardware",
+    "Fake Backend",
+    "Aer Noise Model"
+  ],
+  "problem": {
+    "num_nodes": 10,
+    "num_edges": 21,
+    "num_qubits": 10,
+    "n_bits_per_node": 1,
+    "best_energy": -0.45238095238095244,
+    "best_modularity": 0.45238095238095244,
+    "n_hamiltonian_terms": 46
+  },
+  "circuit": {
+    "ansatz_depth_original": 17,
+    "ansatz_depth_transpiled": 44,
+    "two_qubit_gates_transpiled": 36,
+    "noise_reference_backend": "fake_guadalupe"
+  }
+}

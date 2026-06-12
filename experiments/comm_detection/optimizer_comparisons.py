@@ -10,29 +10,29 @@ from src.simulator import QuimbSimulator
 from src.optimizer import COBYLA, SMO, Adam
 from src.lvqe import LayerVQE
 from src.logging_utils import start_run, nested_run, log_figure
- 
+
 # PYTHONPATH=.
- 
-N_NODES        = 20
+
+N_NODES        = 15
 K_COMMUNITIES  = 4
 N_LAYERS       = 2
-OPTIMIZERS     = [SMO, COBYLA]            
+OPTIMIZERS     = [SMO, COBYLA, Adam]            
 OPTIMIZER_KWARGS = {
     "SMO":    {"verbose": True},
     "COBYLA": {"verbose": True},
     "Adam":   {"verbose": True, "lr": 0.15},
 }
-N_RUNS         = 5
+N_RUNS         = 4
 K_PER_LAYER    = 200
 K_FINAL        = 500
 USE_SAMPLING   = True
-N_SAMPLES      = 250
+N_SAMPLES      = 100
 GRAPH_TYPE     = "gnp"
 SEED_GRAPH     = 10
 SEED_ANGLES    = 50
  
 CHECKPOINT_FILE = "experiments/comm_detection/optimizer_comparison_checkpoint.json"
- 
+
 PARAMS = dict(
     problem        = "community_detection_optimizer_comparison",
     graph_type     = GRAPH_TYPE,
@@ -66,7 +66,7 @@ def load_checkpoint():
 def save_checkpoint(data):
     os.makedirs(os.path.dirname(CHECKPOINT_FILE), exist_ok=True)
     with open(CHECKPOINT_FILE, "w") as f:
-        json.dump(data, f)
+        json.dump(data, f, indent=2)
     print(f"Checkpoint saved to {CHECKPOINT_FILE}")
  
  
@@ -149,7 +149,7 @@ def make_ratio_plot(checkpoint, optimizers, n_layers, n_runs, num_nodes, k, grap
     ax.set_title(f"L-VQE approximation ratio vs. layers — optimizer comparison\n"
                  f"({n_runs} seeds, {graph_type} graph, n={num_nodes}, k={k})")
     ax.set_xticks(layers)
-    ax.set_ylim(bottom=0.5, top=1.05)
+    ax.set_ylim(bottom=0.1, top=1.2)
     ax.legend()
     ax.grid(True, linestyle="--", alpha=0.4)
     fig.tight_layout()
@@ -186,8 +186,40 @@ def make_violin_plot(checkpoint, optimizers, n_layers, n_runs):
     ax.set_xticks(layers)
     ax.set_xticklabels([f"{l} Layer" for l in layers])
     ax.set_ylabel("Approximation ratio")
-    ax.set_ylim(0.4, 1.05)
+    ax.set_ylim(0.1, 1.2)
     ax.set_title(f"Approximation ratio distribution — optimizer comparison ({n_runs} seeds)")
+    ax.legend()
+    ax.grid(True, axis='y', linestyle="--", alpha=0.4)
+    fig.tight_layout()
+    return fig
+
+
+def make_violin_plot_decoded(checkpoint, optimizers, n_runs):
+    fig, ax = plt.subplots(figsize=(6, 5))
+    n_opts  = len(optimizers)
+    width   = 0.6 / n_opts
+
+    for opt_idx, (opt_class, color) in enumerate(zip(optimizers, COLORS)):
+        entries = checkpoint[opt_class.__name__]
+        ratios  = np.array([e["final_approx_ratio_decoded"] for e in entries.values()])
+        offset  = (opt_idx - (n_opts - 1) / 2) * width
+
+        parts = ax.violinplot([ratios], positions=[1 + offset], widths=width * 0.9,
+                              showmedians=True, showextrema=True)
+        for pc in parts['bodies']:
+            pc.set_facecolor(color)
+            pc.set_alpha(0.6)
+            pc.set_edgecolor("black")
+        for key in ('cbars', 'cmins', 'cmaxes', 'cmedians'):
+            if key in parts:
+                parts[key].set_color(color)
+        ax.plot([], [], color=color, linewidth=8, alpha=0.6, label=opt_class.__name__)
+
+    ax.set_xticks([1])
+    ax.set_xticklabels(["Final layer (decoded)"])
+    ax.set_ylabel("Approximation ratio (decoded)")
+    ax.set_ylim(0.1, 1.2)
+    ax.set_title(f"Decoded approximation ratio — optimizer comparison ({n_runs} seeds)")
     ax.legend()
     ax.grid(True, axis='y', linestyle="--", alpha=0.4)
     fig.tight_layout()
@@ -229,12 +261,19 @@ for opt_class in OPTIMIZERS:
             optimizer_kwargs = opt_kwargs,
             seed             = s,
         ).run()
+
+        bitstrings = sim.get_most_frequent_assignments(
+            result["final_params"], result["final_ansatz"], problem, n_samples=N_SAMPLES
+        )
+        best_assignment, _ = bitstrings[0]
+        ratio_decoded = problem.evaluate(best_assignment) / q_best
  
         checkpoint[opt_name][str(s)] = {
             "ratios_per_layer":   [float(r) for r in result["history"]["approx_ratio"]],
             "loss_per_layer":     [[float(x) for x in layer_loss]
                                    for layer_loss in result["history"]["optimizer_loss"]],
             "final_approx_ratio": float(result["final_approx_ratio"]),
+            "final_approx_ratio_decoded": float(ratio_decoded)
         }
         save_checkpoint(checkpoint)
 
@@ -284,5 +323,8 @@ with start_run("lvqe-optimizer-comparison", PARAMS):
                "approx_ratio_vs_layers.png")
     log_figure(make_violin_plot(checkpoint, OPTIMIZERS, N_LAYERS, N_RUNS),
                "approx_ratio_violin.png")
+    
+    log_figure(make_violin_plot_decoded(checkpoint, OPTIMIZERS, N_RUNS),
+            "approx_ratio_violin_decoded.png")
 
 print("Done. View results with:  mlflow ui")
