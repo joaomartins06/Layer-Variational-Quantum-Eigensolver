@@ -34,10 +34,25 @@ experiments/maxcut/
   schwagerl.py              # Benchmark, following Schwagerl et al. (2026) approach
   qaoa_comparison.py        # QAOA comparison
   plot_model_comparison.py  # Cross-model result plots
+  results/                  # Saved experiment results (JSON) and plots
 
-notebooks/              # Exploratory notebooks
-quantum_walk/           # Quantum-walk baseline
-results/
+experiments/comm_detection/
+  comm_detection_layers.py             # L-VQE layer ablation for community detection
+  convergence.py                       # Convergence experiment
+  optimizer_comparisons.py             # Optimizer comparison experiment
+  convergence_checkpoint.json          # Checkpoint for convergence runs
+  optimizer_comparison_checkpoint.json # Checkpoint for optimizer comparison runs
+
+notebooks/              # Exploratory notebooks (Max-Cut, community detection, IBM hardware, QW)
+
+quantum_walk/
+  community_detection_qw.py # Quantum-walk baseline for community detection
+
+presentation/
+  figures/                  # Exported plots for the presentation
+  notes.md                  # Presentation notes (outline draft)
+
+results/                # Hardware run result images
 liu.pdf                 # Reference paper
 ```
 
@@ -119,9 +134,3 @@ Run this from the **project root** to see all tracked experiments.
 
 > [!IMPORTANT]
 > `mlruns/` and `mlflow.db` are gitignored — runs stay local to your machine.
-
----
-
-## Algorithm overview
-
-# TODO
