@@ -10,12 +10,12 @@ from src.simulator import QuimbSimulator
 from src.optimizer import COBYLA, SMO, Adam
 from src.lvqe import LayerVQE
 from src.logging_utils import start_run, nested_run, log_figure
- 
+
 # PYTHONPATH=.
- 
+
 N_NODES_LIST   = [8, 12, 16, 20]
 K_COMMUNITIES  = 4
-LAYER_CONFIGS  = [0, 1, 2] 
+LAYER_CONFIGS  = [0, 1, 2]
 
 OPTIMIZER      = COBYLA
 N_RUNS         = 3
@@ -156,7 +156,6 @@ def make_scaling_plot(results, layer_configs, graph_type, optimizer_name, use_sa
             n_fine = np.linspace(n_arr.min(), n_arr.max(), 200)
             ax.plot(n_fine, 2**b * n_fine**a, "--", color=color, alpha=0.6)
  
-    ax.set_xscale("log", base=2)
     ax.set_yscale("log", base=2)
     ax.set_xlabel("Number of nodes (n)")
     ax.set_ylabel("Iterations (y)")
@@ -218,8 +217,8 @@ if OPTIMIZER is Adam:
     optimizer_kwargs["lr"] = LEARNING_RATE
  
 for n_nodes in N_NODES_LIST:
-    if all(n_nodes in results[nl] for nl in LAYER_CONFIGS):
-        print(f"Skipping n={n_nodes} (already in checkpoint)")
+    if all(n_nodes in results[nl] and len(results[nl][n_nodes]) >= N_RUNS for nl in LAYER_CONFIGS):
+        print(f"Skipping n={n_nodes} (already complete)")
         continue
  
     print(f"\n{'='*72}\n n_nodes = {n_nodes}\n{'='*72}")
@@ -229,13 +228,19 @@ for n_nodes in N_NODES_LIST:
     print(f"  n_qubits: {problem.num_qubits}, n_terms: {len(problem.hamiltonian_terms)}")
  
     for nl in LAYER_CONFIGS:
-        results[nl][n_nodes]       = []
-        conv_flags[nl][n_nodes]    = []
-        approx_ratios[nl][n_nodes] = []
+        if n_nodes not in results[nl]:
+            results[nl][n_nodes]       = []
+            conv_flags[nl][n_nodes]    = []
+            approx_ratios[nl][n_nodes] = []
  
-    for s in seeds:
+    for seed_idx, s in enumerate(seeds):
         print(f"\n  --- seed = {s} ---")
+
+
         for n_layers in LAYER_CONFIGS:
+            if len(results[n_layers][n_nodes]) > seed_idx:
+                print(f"    Skipping n={n_nodes}, L={n_layers}, seed={s} (already done)")
+                continue
             k_per_run = MAX_ITER if n_layers == 0 else K_PER_LAYER
  
             result = LayerVQE(
@@ -265,11 +270,11 @@ for n_nodes in N_NODES_LIST:
             tag = "OK" if converged else "CAP"
             print(f"    L={n_layers}: iters={n_iter:>5} [{tag}], approx_ratio={ratio:+.4f}")
  
-    save_checkpoint(results, conv_flags, approx_ratios)
+            save_checkpoint(results, conv_flags, approx_ratios)
  
 # ── MLflow + plot — only when all nodes are done ───────────────────────────────
 all_done = all(
-    n_nodes in results[nl]
+    n_nodes in results[nl] and len(results[nl][n_nodes]) >= N_RUNS
     for n_nodes in N_NODES_LIST
     for nl in LAYER_CONFIGS
 )

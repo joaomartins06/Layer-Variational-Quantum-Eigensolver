@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import mlflow
 import matplotlib.cm as cm
 from networkx.algorithms.community import louvain_communities
+from sklearn.neighbors import kneighbors_graph
 
 from src.community_detection import CommunityDetection
 from src.simulator import QuimbSimulator
@@ -12,20 +13,21 @@ from src.lvqe import LayerVQE
 from src.logging_utils import start_run, nested_run, log_figure, log_metrics_series
 
 #sorry, this is the command I have to add to run, just so I dont forget :)
-#PYTHONPATH=. 
+
+#PYTHONPATH=.
 
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-N_NODES = 15
+N_NODES = 17
 K_COMMUNITIES = 4
 N_LAYERS = 2
-OPTIMIZER = SMO
+OPTIMIZER = COBYLA
 N_RUNS = 5
 K_PER_LAYER = 200
 K_FINAL = 500
-USE_SAMPLING = True
+USE_SAMPLING = False
 N_SAMPLES = 250
-GRAPH_TYPE = "gnp"   # "caveman", "gnp", "regular"
+GRAPH_TYPE = "windmill"   # "caveman", "gnp", "regular", "gaussian", "windmill"
 SEED_GRAPH = 10
 SEED_ANGLES = 50
 LEARNING_RATE = 0.15
@@ -74,6 +76,28 @@ def get_graph(graph_type: str, N: int, k: int, seed: int):
             if nx.is_connected(G):
                 return G
             s += 1
+    
+    elif graph_type == "gaussian":
+        n_per_cluster = N // k
+        std = 0.5
+        centres = [(0, 0), (3, 0), (0, 3), (3, 3)][:k]
+
+        s = seed
+        while True:
+            rng = np.random.default_rng(s)
+            pos_array = np.vstack([
+                rng.normal(loc=c, scale=std, size=(n_per_cluster, 2))
+                for c in centres
+            ])
+            A = kneighbors_graph(pos_array, n_neighbors=3, mode='connectivity', include_self=False)
+            A = (A + A.T)
+            G = nx.from_scipy_sparse_array(A)
+            if nx.is_connected(G):
+                return G
+            s += 1
+    elif graph_type == "windmill":
+        n_cliques, clique_size = 4, 5  # 17 nodes
+        return nx.windmill_graph(n_cliques, clique_size)
     else:
         raise ValueError(f"Unknown graph type: {graph_type}")
 
