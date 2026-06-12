@@ -45,7 +45,7 @@ for run in all_runs:
     sem_r  = run.data.metrics.get("sem_final_approx_ratio")
     if mean_r is None:
         continue
-    model = "Layer VQE" if m.group(1) == "layer" else "Base VQE"
+    model = "L-VQE" if m.group(1) == "layer" else "Base VQE"
     records.append({
         "model":      model,
         "n_layers":   int(m.group(2)),
@@ -63,22 +63,22 @@ df = (
       .first()
 )
 
-layer_vqe = df[df["model"] == "Layer VQE"].sort_values("n_layers")
+layer_vqe = df[df["model"] == "L-VQE"].sort_values("n_layers")
 base_vqe  = df[df["model"] == "Base VQE" ].sort_values("n_layers")
 
-# n_layers=0 (base0) is shared — add it to the Layer VQE curve too
+# n_layers=0 (base0) is shared — add it to the L-VQE curve too
 baseline = base_vqe[base_vqe["n_layers"] == 0]
 if not baseline.empty and 0 not in layer_vqe["n_layers"].values:
     layer_vqe = pd.concat(
-        [baseline.assign(model="Layer VQE"), layer_vqe], ignore_index=True
+        [baseline.assign(model="L-VQE"), layer_vqe], ignore_index=True
     ).sort_values("n_layers")
 
 # ── Plot ───────────────────────────────────────────────────────────────────────
 fig, ax = plt.subplots(figsize=(7, 4.5))
 
-COLORS = {"Layer VQE": "steelblue", "Base VQE": "crimson"}
+COLORS = {"L-VQE": "steelblue", "Base VQE": "crimson"}
 
-for label, sub_df in [("Layer VQE", layer_vqe), ("Base VQE", base_vqe)]:
+for label, sub_df in [("L-VQE", layer_vqe), ("Base VQE", base_vqe)]:
     color = COLORS[label]
     x = sub_df["n_layers"].values
     y = sub_df["mean"].values
@@ -92,12 +92,12 @@ for label, sub_df in [("Layer VQE", layer_vqe), ("Base VQE", base_vqe)]:
     )
     ax.fill_between(x, y - e, y + e, alpha=0.15, color=color, zorder=2)
 
-ax.axhline(y=1.0, color="black", linestyle=":", linewidth=1.2, alpha=0.6, label="BKV (SW)")
+ax.axhline(y=1.0, color="black", linestyle=":", linewidth=1.2, alpha=0.6, label="BKV (GW)")
 
 ax.set_xlabel("Number of layers", fontsize=12)
 ax.set_ylabel("Final approximation ratio", fontsize=12)
 ax.set_title(
-    f"Layer VQE vs Base VQE — approximation ratio vs. layers\n"
+    f"L-VQE vs Base VQE — approximation ratio vs. layers\n"
     f"({N_NODES}-node 3-regular graph, mean ± SEM across instances)",
     fontsize=11,
 )
@@ -116,9 +116,9 @@ plt.show()
 import matplotlib as mpl
 
 with mpl.rc_context({"font.size": 13, "font.family": "sans-serif"}):
-    fig_b, ax_b = plt.subplots(figsize=(8, 4.8))
+    fig_b, ax_b = plt.subplots(figsize=(6, 4))
 
-    for label, sub_df in [("Layer VQE", layer_vqe), ("Base VQE", base_vqe)]:
+    for label, sub_df in [("L-VQE", layer_vqe), ("Base VQE", base_vqe)]:
         color = COLORS[label]
         x = sub_df["n_layers"].values
         y = sub_df["mean"].values
@@ -132,28 +132,12 @@ with mpl.rc_context({"font.size": 13, "font.family": "sans-serif"}):
         )
         ax_b.fill_between(x, y - e, y + e, alpha=0.15, color=color, zorder=2)
 
-    ax_b.axhline(y=1.0, color="black", linestyle=":", linewidth=1.5, alpha=0.6, label="BKV (SW)")
+    ax_b.axhline(y=1.0, color="black", linestyle=":", linewidth=1.5, alpha=0.6, label="BKV (GW)")
 
     # Double-headed arrow annotating the gap at layer 2
     x_ann = 2
     lvqe_row = layer_vqe[layer_vqe["n_layers"] == x_ann]
     bvqe_row = base_vqe[base_vqe["n_layers"] == x_ann]
-    if not lvqe_row.empty and not bvqe_row.empty:
-        lvqe_y = lvqe_row["mean"].values[0]
-        bvqe_y = bvqe_row["mean"].values[0]
-        gap = lvqe_y - bvqe_y
-        ax_b.annotate(
-            "",
-            xy=(x_ann + 0.13, bvqe_y),
-            xytext=(x_ann + 0.13, lvqe_y),
-            arrowprops=dict(arrowstyle="<->", color="#555555", lw=1.5),
-            zorder=5,
-        )
-        ax_b.text(
-            x_ann + 0.20, (lvqe_y + bvqe_y) / 2,
-            f"$\\Delta = {gap:.3f}$",
-            fontsize=11, color="#555555", va="center",
-        )
 
     ax_b.set_xlabel("Number of layers", fontsize=15)
     ax_b.set_ylabel("Final approximation ratio", fontsize=15)
