@@ -18,7 +18,7 @@ from src.logging_utils import start_run, nested_run, log_figure, log_metrics_ser
 
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-N_NODES = 17
+N_NODES = 20
 K_COMMUNITIES = 4
 N_LAYERS = 2
 OPTIMIZER = COBYLA
@@ -27,7 +27,7 @@ K_PER_LAYER = 200
 K_FINAL = 500
 USE_SAMPLING = False
 N_SAMPLES = 250
-GRAPH_TYPE = "windmill"   # "caveman", "gnp", "regular", "gaussian", "windmill"
+GRAPH_TYPE = "caveman"   # "caveman", "gnp", "regular", "gaussian", "windmill"
 SEED_GRAPH = 10
 SEED_ANGLES = 50
 LEARNING_RATE = 0.15
@@ -169,7 +169,7 @@ def make_loss_plot(all_losses: list, n_layers: int, k_per_layer: int, n_runs: in
                 linewidth=1.5, label="Seed trajectories" if i == 0 else "")
     for idx in range(1, n_layers + 1):
         ax.axvline(x=k_per_layer * idx, color="black", linestyle="--", alpha=0.6,
-                   label="Layer added" if idx == 1 else "")
+                label="Layer added" if idx == 1 else "")
     ax.set_xlabel("Total optimisation iterations")
     ax.set_ylabel("Energy (loss)")
     ax.set_title(f"Training loss evolution across L-VQE layers ({n_runs} seeds)")
@@ -179,7 +179,7 @@ def make_loss_plot(all_losses: list, n_layers: int, k_per_layer: int, n_runs: in
     return fig
 
 
-# ── Experiment ─────────────────────────────────────────────────────────────────
+# ── Experiment ─────────────────────────
 all_ratios_energy = []
 all_losses = []
 all_modularities_decoded = []
