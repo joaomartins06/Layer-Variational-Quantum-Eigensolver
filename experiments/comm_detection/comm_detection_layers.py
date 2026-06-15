@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import mlflow
 import matplotlib.cm as cm
 from networkx.algorithms.community import louvain_communities
+from sklearn.neighbors import kneighbors_graph
 
 from src.community_detection import CommunityDetection
 from src.simulator import QuimbSimulator
@@ -12,20 +13,21 @@ from src.lvqe import LayerVQE
 from src.logging_utils import start_run, nested_run, log_figure, log_metrics_series
 
 #sorry, this is the command I have to add to run, just so I dont forget :)
-#PYTHONPATH=. 
+
+#PYTHONPATH=.
 
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-N_NODES = 15
+N_NODES = 20
 K_COMMUNITIES = 4
 N_LAYERS = 2
-OPTIMIZER = SMO
+OPTIMIZER = COBYLA
 N_RUNS = 5
 K_PER_LAYER = 200
 K_FINAL = 500
-USE_SAMPLING = True
+USE_SAMPLING = False
 N_SAMPLES = 250
-GRAPH_TYPE = "gnp"   # "caveman", "gnp", "regular"
+GRAPH_TYPE = "caveman"   # "caveman", "gnp", "regular", "gaussian", "windmill"
 SEED_GRAPH = 10
 SEED_ANGLES = 50
 LEARNING_RATE = 0.15
@@ -74,6 +76,28 @@ def get_graph(graph_type: str, N: int, k: int, seed: int):
             if nx.is_connected(G):
                 return G
             s += 1
+    
+    elif graph_type == "gaussian":
+        n_per_cluster = N // k
+        std = 0.5
+        centres = [(0, 0), (3, 0), (0, 3), (3, 3)][:k]
+
+        s = seed
+        while True:
+            rng = np.random.default_rng(s)
+            pos_array = np.vstack([
+                rng.normal(loc=c, scale=std, size=(n_per_cluster, 2))
+                for c in centres
+            ])
+            A = kneighbors_graph(pos_array, n_neighbors=3, mode='connectivity', include_self=False)
+            A = (A + A.T)
+            G = nx.from_scipy_sparse_array(A)
+            if nx.is_connected(G):
+                return G
+            s += 1
+    elif graph_type == "windmill":
+        n_cliques, clique_size = 4, 5  # 17 nodes
+        return nx.windmill_graph(n_cliques, clique_size)
     else:
         raise ValueError(f"Unknown graph type: {graph_type}")
 
@@ -145,7 +169,7 @@ def make_loss_plot(all_losses: list, n_layers: int, k_per_layer: int, n_runs: in
                 linewidth=1.5, label="Seed trajectories" if i == 0 else "")
     for idx in range(1, n_layers + 1):
         ax.axvline(x=k_per_layer * idx, color="black", linestyle="--", alpha=0.6,
-                   label="Layer added" if idx == 1 else "")
+                label="Layer added" if idx == 1 else "")
     ax.set_xlabel("Total optimisation iterations")
     ax.set_ylabel("Energy (loss)")
     ax.set_title(f"Training loss evolution across L-VQE layers ({n_runs} seeds)")
@@ -155,7 +179,7 @@ def make_loss_plot(all_losses: list, n_layers: int, k_per_layer: int, n_runs: in
     return fig
 
 
-# ── Experiment ─────────────────────────────────────────────────────────────────
+# ── Experiment ─────────────────────────
 all_ratios_energy = []
 all_losses = []
 all_modularities_decoded = []
